@@ -1,7 +1,11 @@
 ## Interface: 30300
 ## Title: SmartLoot
-## Notes: Recoge automáticamente solo los items que configures
+## Notes: Addon inteligente de loot con filtros avanzados
 ## Author: LoD-heba
-## Version: 1.0
+## Version: 2.0
+## SavedVariables: SmartLootDB
 
-SmartLoot.lua
+Items.lua
+Config.lua
+Core.lua
+UI.lua
