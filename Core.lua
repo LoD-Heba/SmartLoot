@@ -1,6 +1,3 @@
--- Core.lua - Archivo principal de SmartLoot
--- Este archivo maneja la lógica central del addon
-
 SmartLoot = SmartLoot or {}
 local SL = SmartLoot
 
@@ -11,34 +8,6 @@ local SL = SmartLoot
 SL.version = "2.0"
 SL.frame = CreateFrame("Frame")
 
--- Configuración por defecto
-SL.config = {
-    enabled = false,
-    showMessages = true,
-    debugMode = false,
-    showItemID = false,  -- NUEVO: Mostrar ID de items en tooltip
-    
-    -- Categorías
-    lootCloths = true,
-    lootFood = false,
-    lootCookingMats = true,
-    lootFishing = true,
-    lootQuestItems = true,
-    
-    -- Calidades
-    lootRecipes = true,
-    lootGreenAny = true,
-    lootBlue67to80 = true,
-    lootPurple67to80 = true,
-    
-    -- Opciones
-    ignoreGrey = true,
-    lootMoney = true,
-}
-
--- Lista de items ignorados (NUEVO)
-SL.IgnoredItems = SL.IgnoredItems or {}
-
 -- ===========================================
 -- FUNCIONES DE LOOT
 -- ===========================================
@@ -46,7 +15,7 @@ SL.IgnoredItems = SL.IgnoredItems or {}
 function SL:ShouldLootByCategory(itemID)
     -- Revisar todas las profesiones
     for profKey, profession in pairs(self.ItemDatabase) do
-        if profession.items[itemID] then
+        if profession.items and profession.items[itemID] then
             local item = profession.items[itemID]
             if item.enabled then
                 return true, profession.name
@@ -70,14 +39,14 @@ function SL:ShouldLootByQuality(itemLink, lootQuality)
     
     -- OBJETOS DE MISIÓN
     if self.config.lootQuestItems then
-        if itemSubType == "Quest" or string.find(itemType or "", "Quest") then
+        if itemSubType == "Quest" or (itemType and string.find(itemType, "Quest")) then
             return true, "Misión"
         end
     end
     
     -- RECETAS
     if self.config.lootRecipes then
-        if itemType == "Recipe" or string.find(itemName or "", "Recipe:") or string.find(itemName or "", "Receta:") then
+        if itemType == "Recipe" or (itemName and (string.find(itemName, "Recipe:") or string.find(itemName, "Receta:"))) then
             return true, "Receta"
         end
     end
@@ -173,7 +142,7 @@ end
 -- ===========================================
 
 local function AddItemIDToTooltip(tooltip, data)
-    if not SL.config.showItemID then return end
+    if not SL.config or not SL.config.showItemID then return end
     
     -- Obtener el item del tooltip
     local _, itemLink = tooltip:GetItem()
@@ -189,11 +158,15 @@ local function AddItemIDToTooltip(tooltip, data)
 end
 
 -- Hook a los tooltips
-GameTooltip:HookScript("OnTooltipSetItem", AddItemIDToTooltip)
-ItemRefTooltip:HookScript("OnTooltipSetItem", AddItemIDToTooltip)
+local tooltipFrame = CreateFrame("Frame")
+tooltipFrame:RegisterEvent("PLAYER_LOGIN")
+tooltipFrame:SetScript("OnEvent", function()
+    GameTooltip:HookScript("OnTooltipSetItem", AddItemIDToTooltip)
+    ItemRefTooltip:HookScript("OnTooltipSetItem", AddItemIDToTooltip)
+end)
 
 -- ===========================================
--- COMANDOS (ACTUALIZADO)
+-- COMANDOS
 -- ===========================================
 
 function SL:HandleCommand(msg)
@@ -209,23 +182,29 @@ function SL:HandleCommand(msg)
     
     if cmd == "on" then
         self.config.enabled = true
-        self.UI:Show()
-        self.UI:UpdateStatus()
+        if self.UI and self.UI.MainFrame then
+            self.UI.MainFrame:Show()
+            self.UI:UpdateStatus()
+        end
         self:SaveConfig()
         DEFAULT_CHAT_FRAME:AddMessage("|cFF00FF00[SmartLoot]|r Activado")
         
     elseif cmd == "off" then
         self.config.enabled = false
-        self.UI:Hide()
-        self.UI:UpdateStatus()
+        if self.UI and self.UI.MainFrame then
+            self.UI.MainFrame:Hide()
+            self.UI:UpdateStatus()
+        end
         self:SaveConfig()
         DEFAULT_CHAT_FRAME:AddMessage("|cFFFF0000[SmartLoot]|r Desactivado")
         
     elseif cmd == "toggle" or cmd == "" then
-        if self.UI.MainFrame:IsShown() then
-            self.UI.MainFrame:Hide()
-        else
-            self.UI.MainFrame:Show()
+        if self.UI and self.UI.MainFrame then
+            if self.UI.MainFrame:IsShown() then
+                self.UI.MainFrame:Hide()
+            else
+                self.UI.MainFrame:Show()
+            end
         end
         
     elseif cmd == "ignore" then
@@ -234,7 +213,9 @@ function SL:HandleCommand(msg)
             self.IgnoredItems[itemID] = true
             local itemName = GetItemInfo(itemID) or "ID: " .. itemID
             DEFAULT_CHAT_FRAME:AddMessage("|cFF00FF00[SmartLoot]|r Item ignorado: " .. itemName)
-            self.UI:RefreshIgnoredList()
+            if self.UI then
+                self.UI:RefreshIgnoredList()
+            end
             self:SaveConfig()
         else
             DEFAULT_CHAT_FRAME:AddMessage("|cFFFF0000[SmartLoot]|r Uso: /sl ignore <itemID>")
@@ -246,7 +227,9 @@ function SL:HandleCommand(msg)
             self.IgnoredItems[itemID] = nil
             local itemName = GetItemInfo(itemID) or "ID: " .. itemID
             DEFAULT_CHAT_FRAME:AddMessage("|cFF00FF00[SmartLoot]|r Item desbloqueado: " .. itemName)
-            self.UI:RefreshIgnoredList()
+            if self.UI then
+                self.UI:RefreshIgnoredList()
+            end
             self:SaveConfig()
         else
             DEFAULT_CHAT_FRAME:AddMessage("|cFFFF0000[SmartLoot]|r Item no encontrado")
@@ -287,13 +270,18 @@ function SL:HandleCommand(msg)
     end
 end
 
+SLASH_SMARTLOOT1 = "/smartloot"
+SLASH_SMARTLOOT2 = "/sl"
+SlashCmdList["SMARTLOOT"] = function(msg)
+    SmartLoot:HandleCommand(msg)
+end
+
 -- ===========================================
--- EVENTOS (ACTUALIZADO)
+-- EVENTOS
 -- ===========================================
 
 SL.frame:RegisterEvent("ADDON_LOADED")
 SL.frame:RegisterEvent("LOOT_OPENED")
-SL.frame:RegisterEvent("PLAYER_LOGIN")
 
 SL.frame:SetScript("OnEvent", function(self, event, arg1)
     if event == "ADDON_LOADED" and arg1 == "SmartLoot" then
@@ -303,12 +291,8 @@ SL.frame:SetScript("OnEvent", function(self, event, arg1)
         DEFAULT_CHAT_FRAME:AddMessage("|cFF00FF00[SmartLoot]|r v" .. SL.version .. " Cargado")
         DEFAULT_CHAT_FRAME:AddMessage("|cFFFFFF00[SmartLoot]|r Usa /sl help para comandos")
         
-    elseif event == "PLAYER_LOGIN" then
-        -- Restaurar posiciones guardadas
-        SL:RestorePositions()
-        
     elseif event == "LOOT_OPENED" then
-        if SL.config.enabled then
+        if SL.config and SL.config.enabled then
             local waitFrame = CreateFrame("Frame")
             local elapsed = 0
             waitFrame:SetScript("OnUpdate", function(self, delta)
@@ -329,7 +313,7 @@ function LootFrame_OnShow(self)
         originalLootFrame_OnShow(self)
     end
     
-    if SmartLoot.config.enabled then
+    if SmartLoot.config and SmartLoot.config.enabled then
         local waitFrame = CreateFrame("Frame")
         local elapsed = 0
         waitFrame:SetScript("OnUpdate", function(self, delta)
