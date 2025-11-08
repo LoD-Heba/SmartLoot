@@ -82,6 +82,17 @@ function SL:LoadConfig()
             yOffset = 0,
         }
     end
+    if SmartLootDB.itemStates then
+        for profKey, profession in pairs(self.ItemDatabase) do
+            if SmartLootDB.itemStates[profKey] then
+                for itemID, enabled in pairs(SmartLootDB.itemStates[profKey]) do
+                    if profession.items[itemID] then
+                        profession.items[itemID].enabled = enabled
+                    end
+                end
+            end
+        end
+    end
     
     -- Aplicar configuración cargada
     self.config = SmartLootDB.config
@@ -118,6 +129,13 @@ function SL:SaveConfig()
             xOffset = xOffset,
             yOffset = yOffset,
         }
+    end
+    SmartLootDB.itemStates = {}
+    for profKey, profession in pairs(self.ItemDatabase) do
+        SmartLootDB.itemStates[profKey] = {}
+        for itemID, item in pairs(profession.items) do
+            SmartLootDB.itemStates[profKey][itemID] = item.enabled
+        end
     end
 end
 

@@ -44,17 +44,16 @@ SL.IgnoredItems = SL.IgnoredItems or {}
 -- ===========================================
 
 function SL:ShouldLootByCategory(itemID)
-    if self.config.lootCloths and self.ItemCategories.Cloths[itemID] then
-        return true, "Paño"
-    end
-    if self.config.lootFood and self.ItemCategories.Food[itemID] then
-        return true, "Comida"
-    end
-    if self.config.lootCookingMats and self.ItemCategories.CookingMats[itemID] then
-        return true, "Mat. Cocina"
-    end
-    if self.config.lootFishing and self.ItemCategories.Fishing[itemID] then
-        return true, "Pesca"
+    -- Revisar todas las profesiones
+    for profKey, profession in pairs(self.ItemDatabase) do
+        if profession.items[itemID] then
+            local item = profession.items[itemID]
+            if item.enabled then
+                return true, profession.name
+            else
+                return false, profession.name .. " (desactivado)"
+            end
+        end
     end
     return false, nil
 end
