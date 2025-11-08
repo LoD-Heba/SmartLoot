@@ -1,5 +1,4 @@
 -- Config.lua - Sistema de guardado de configuración
-
 SmartLoot = SmartLoot or {}
 local SL = SmartLoot
 
@@ -12,23 +11,23 @@ SL.DefaultConfig = {
     showMessages = true,
     debugMode = false,
     showItemID = false,
-    
+
     -- Categorías
     lootCloths = true,
     lootFood = false,
     lootCookingMats = true,
     lootFishing = true,
     lootQuestItems = true,
-    
+
     -- Calidades
     lootRecipes = true,
     lootGreenAny = true,
     lootBlue67to80 = true,
     lootPurple67to80 = true,
-    
+
     -- Opciones
     ignoreGrey = true,
-    lootMoney = true,
+    lootMoney = true
 }
 
 SL.DefaultIgnoredItems = {
@@ -45,7 +44,7 @@ function SL:LoadConfig()
     if not SmartLootDB then
         SmartLootDB = {}
     end
-    
+
     -- Cargar configuración
     if not SmartLootDB.config then
         SmartLootDB.config = self:CopyTable(self.DefaultConfig)
@@ -57,32 +56,32 @@ function SL:LoadConfig()
             end
         end
     end
-    
+
     -- Cargar items ignorados
     if not SmartLootDB.ignoredItems then
         SmartLootDB.ignoredItems = self:CopyTable(self.DefaultIgnoredItems)
     end
-    
+
     -- Cargar posición del botón flotante
     if not SmartLootDB.buttonPosition then
         SmartLootDB.buttonPosition = {
-            point = "CENTER",
+            point = "TOPRIGHT",
             relativeTo = "Minimap",
-            relativePoint = "CENTER",
-            xOffset = 0,
-            yOffset = -80,
+            relativePoint = "TOPRIGHT",
+            xOffset = 5,
+            yOffset = 5
         }
     end
-    
+
     -- Cargar posición de la ventana principal
     if not SmartLootDB.framePosition then
         SmartLootDB.framePosition = {
             point = "CENTER",
             xOffset = 0,
-            yOffset = 0,
+            yOffset = 0
         }
     end
-    
+
     -- Cargar estados de items
     if SmartLootDB.itemStates then
         for profKey, profession in pairs(self.ItemDatabase or {}) do
@@ -95,11 +94,11 @@ function SL:LoadConfig()
             end
         end
     end
-    
+
     -- Aplicar configuración cargada
     self.config = SmartLootDB.config
     self.IgnoredItems = SmartLootDB.ignoredItems
-    
+
     DEFAULT_CHAT_FRAME:AddMessage("|cFF00FF00[SmartLoot]|r Configuración cargada")
 end
 
@@ -107,10 +106,10 @@ function SL:SaveConfig()
     if not SmartLootDB then
         SmartLootDB = {}
     end
-    
+
     SmartLootDB.config = self.config
     SmartLootDB.ignoredItems = self.IgnoredItems
-    
+
     -- Guardar posición del botón flotante
     if self.UI and self.UI.FloatingButton then
         local point, _, relativePoint, xOffset, yOffset = self.UI.FloatingButton:GetPoint()
@@ -119,20 +118,20 @@ function SL:SaveConfig()
             relativeTo = "Minimap",
             relativePoint = relativePoint or "CENTER",
             xOffset = xOffset or 0,
-            yOffset = yOffset or -80,
+            yOffset = yOffset or -80
         }
     end
-    
+
     -- Guardar posición de la ventana principal
     if self.UI and self.UI.MainFrame then
         local point, _, _, xOffset, yOffset = self.UI.MainFrame:GetPoint()
         SmartLootDB.framePosition = {
             point = point or "CENTER",
             xOffset = xOffset or 0,
-            yOffset = yOffset or 0,
+            yOffset = yOffset or 0
         }
     end
-    
+
     -- Guardar estados de items
     SmartLootDB.itemStates = {}
     for profKey, profession in pairs(self.ItemDatabase or {}) do
@@ -154,29 +153,29 @@ function SL:ResetConfig()
             relativeTo = "Minimap",
             relativePoint = "CENTER",
             xOffset = 0,
-            yOffset = -80,
+            yOffset = -80
         },
         framePosition = {
             point = "CENTER",
             xOffset = 0,
-            yOffset = 0,
-        },
+            yOffset = 0
+        }
     }
-    
+
     self.config = SmartLootDB.config
     self.IgnoredItems = SmartLootDB.ignoredItems
-    
+
     -- Recargar UI si existe
     if self.UI and self.UI.MainFrame then
         self.UI.MainFrame:ClearAllPoints()
         self.UI.MainFrame:SetPoint("CENTER", 0, 0)
     end
-    
+
     if self.UI and self.UI.FloatingButton then
         self.UI.FloatingButton:ClearAllPoints()
         self.UI.FloatingButton:SetPoint("CENTER", Minimap, "CENTER", 0, -80)
     end
-    
+
     DEFAULT_CHAT_FRAME:AddMessage("|cFF00FF00[SmartLoot]|r Configuración reseteada a valores por defecto")
     DEFAULT_CHAT_FRAME:AddMessage("|cFFFFFF00[SmartLoot]|r Usa /reload para aplicar cambios completamente")
 end
@@ -201,27 +200,27 @@ end
 
 function SL:RestorePositions()
     -- Restaurar posición del botón flotante
-    if self.UI and self.UI.FloatingButton and SmartLootDB and SmartLootDB.buttonPosition then
-        local pos = SmartLootDB.buttonPosition
-        self.UI.FloatingButton:ClearAllPoints()
-        self.UI.FloatingButton:SetPoint(
-            pos.point or "CENTER",
-            Minimap,
-            pos.relativePoint or "CENTER",
-            pos.xOffset or 0,
-            pos.yOffset or -80
-        )
+    if self.UI and self.UI.FloatingButton then
+        if SmartLootDB and SmartLootDB.buttonPosition then
+            local pos = SmartLootDB.buttonPosition
+            self.UI.FloatingButton:ClearAllPoints()
+            self.UI.FloatingButton:SetPoint(pos.point or "TOPRIGHT", Minimap, pos.relativePoint or "TOPRIGHT",
+                pos.xOffset or 5, pos.yOffset or 5)
+        else
+            -- Posición por defecto si no hay guardada
+            self.UI.FloatingButton:ClearAllPoints()
+            self.UI.FloatingButton:SetPoint("TOPRIGHT", Minimap, "TOPRIGHT", 5, 5)
+        end
+        self.UI.FloatingButton:Show()
     end
-    
+
     -- Restaurar posición de la ventana principal
-    if self.UI and self.UI.MainFrame and SmartLootDB and SmartLootDB.framePosition then
-        local pos = SmartLootDB.framePosition
-        self.UI.MainFrame:ClearAllPoints()
-        self.UI.MainFrame:SetPoint(
-            pos.point or "CENTER",
-            pos.xOffset or 0,
-            pos.yOffset or 0
-        )
+    if self.UI and self.UI.MainFrame then
+        if SmartLootDB and SmartLootDB.framePosition then
+            local pos = SmartLootDB.framePosition
+            self.UI.MainFrame:ClearAllPoints()
+            self.UI.MainFrame:SetPoint(pos.point or "CENTER", pos.xOffset or 0, pos.yOffset or 0)
+        end
     end
 end
 

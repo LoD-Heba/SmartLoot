@@ -28,75 +28,80 @@ function SL:ShouldLootByCategory(itemID)
 end
 
 function SL:ShouldLootByQuality(itemLink, lootQuality)
-    if not itemLink then return false end
-    
+    if not itemLink then
+        return false
+    end
+
     -- Ignorar grises si está activado
     if self.config.ignoreGrey and lootQuality == 0 then
         return false, "Gris (ignorado)"
     end
-    
+
     local itemName, _, itemRarity, itemLevel, itemMinLevel, itemType, itemSubType = GetItemInfo(itemLink)
-    
+    -- Si GetItemInfo falla, retornar false
+    if not itemName then
+        return false, nil
+    end
     -- OBJETOS DE MISIÓN
     if self.config.lootQuestItems then
         if itemSubType == "Quest" or (itemType and string.find(itemType, "Quest")) then
             return true, "Misión"
         end
     end
-    
+
     -- RECETAS
     if self.config.lootRecipes then
         if itemType == "Recipe" or (itemName and (string.find(itemName, "Recipe:") or string.find(itemName, "Receta:"))) then
             return true, "Receta"
         end
     end
-    
+
     -- VERDES
     if self.config.lootGreenAny and itemRarity == 2 then
         return true, "Verde"
     end
-    
+
     -- AZULES 67-80
     if self.config.lootBlue67to80 and itemRarity == 3 then
         if itemLevel >= 67 and itemLevel <= 80 then
             return true, "Azul 67-80"
         end
     end
-    
+
     -- MORADOS 67-80
     if self.config.lootPurple67to80 and itemRarity == 4 then
         if itemLevel >= 67 and itemLevel <= 80 then
             return true, "Morado 67-80"
         end
     end
-    
+
     return false, nil
 end
 
 function SL:SmartLootCorpse()
-    if not self.config.enabled then 
-        return 
+    if not self.config.enabled then
+        return
     end
-    
+
     local numItems = GetNumLootItems()
-    
+
     if self.config.debugMode then
         DEFAULT_CHAT_FRAME:AddMessage("|cFFFFFF00[SmartLoot]|r Detectados " .. numItems .. " items")
     end
-    
-    if numItems == 0 then 
-        return 
+
+    if numItems == 0 then
+        return
     end
-    
+
     for slot = numItems, 1, -1 do
         local lootIcon, lootName, lootQuantity, currencyID, lootQuality, locked = GetLootSlotInfo(slot)
         local itemLink = GetLootSlotLink(slot)
-        
+
         if locked then
             -- Ignorar bloqueados
         elseif itemLink then
             local itemID = tonumber(string.match(itemLink, "item:(%d+)"))
-            
+
             -- VERIFICAR SI ESTÁ EN LISTA DE IGNORADOS
             if self.IgnoredItems[itemID] then
                 if self.config.debugMode then
@@ -105,7 +110,7 @@ function SL:SmartLootCorpse()
             else
                 local shouldLoot = false
                 local reason = ""
-                
+
                 -- Verificar por categoría
                 local catCheck, catReason = self:ShouldLootByCategory(itemID)
                 if catCheck then
@@ -119,11 +124,12 @@ function SL:SmartLootCorpse()
                         reason = qualReason
                     end
                 end
-                
+
                 if shouldLoot then
                     LootSlot(slot)
                     if self.config.showMessages then
-                        DEFAULT_CHAT_FRAME:AddMessage("|cFF00FF00[SmartLoot]|r " .. itemLink .. " |cFF888888(" .. reason .. ")|r")
+                        DEFAULT_CHAT_FRAME:AddMessage(
+                            "|cFF00FF00[SmartLoot]|r " .. itemLink .. " |cFF888888(" .. reason .. ")|r")
                     end
                 end
             end
@@ -141,9 +147,11 @@ end
 -- TOOLTIP - MOSTRAR ID DE ITEMS
 -- ===========================================
 
-local function AddItemIDToTooltip(tooltip, data)
-    if not SL.config or not SL.config.showItemID then return end
-    
+local function AddItemIDToTooltip(tooltip)
+    if not SL.config or not SL.config.showItemID then
+        return
+    end
+
     -- Obtener el item del tooltip
     local _, itemLink = tooltip:GetItem()
     if itemLink then
@@ -172,14 +180,14 @@ end)
 function SL:HandleCommand(msg)
     msg = string.lower(msg or "")
     msg = string.gsub(msg, "^%s*(.-)%s*$", "%1")
-    
+
     local args = {}
     for word in string.gmatch(msg, "%S+") do
         table.insert(args, word)
     end
-    
+
     local cmd = args[1] or ""
-    
+
     if cmd == "on" then
         self.config.enabled = true
         if self.UI and self.UI.MainFrame then
@@ -188,7 +196,7 @@ function SL:HandleCommand(msg)
         end
         self:SaveConfig()
         DEFAULT_CHAT_FRAME:AddMessage("|cFF00FF00[SmartLoot]|r Activado")
-        
+
     elseif cmd == "off" then
         self.config.enabled = false
         if self.UI and self.UI.MainFrame then
@@ -197,7 +205,7 @@ function SL:HandleCommand(msg)
         end
         self:SaveConfig()
         DEFAULT_CHAT_FRAME:AddMessage("|cFFFF0000[SmartLoot]|r Desactivado")
-        
+
     elseif cmd == "toggle" or cmd == "" then
         if self.UI and self.UI.MainFrame then
             if self.UI.MainFrame:IsShown() then
@@ -206,7 +214,7 @@ function SL:HandleCommand(msg)
                 self.UI.MainFrame:Show()
             end
         end
-        
+
     elseif cmd == "ignore" then
         local itemID = tonumber(args[2])
         if itemID then
@@ -220,7 +228,7 @@ function SL:HandleCommand(msg)
         else
             DEFAULT_CHAT_FRAME:AddMessage("|cFFFF0000[SmartLoot]|r Uso: /sl ignore <itemID>")
         end
-        
+
     elseif cmd == "unignore" then
         local itemID = tonumber(args[2])
         if itemID and self.IgnoredItems[itemID] then
@@ -234,25 +242,25 @@ function SL:HandleCommand(msg)
         else
             DEFAULT_CHAT_FRAME:AddMessage("|cFFFF0000[SmartLoot]|r Item no encontrado")
         end
-        
+
     elseif cmd == "showid" then
         self.config.showItemID = not self.config.showItemID
         local status = self.config.showItemID and "Activado" or "Desactivado"
         DEFAULT_CHAT_FRAME:AddMessage("|cFF00FF00[SmartLoot]|r Mostrar ID: " .. status)
         self:SaveConfig()
-        
+
     elseif cmd == "debug" then
         self.config.debugMode = not self.config.debugMode
         DEFAULT_CHAT_FRAME:AddMessage("|cFF00FF00[SmartLoot]|r Debug: " .. (self.config.debugMode and "SI" or "NO"))
         self:SaveConfig()
-        
+
     elseif cmd == "reset" then
         self:ResetConfig()
-        
+
     elseif cmd == "save" then
         self:SaveConfig()
         DEFAULT_CHAT_FRAME:AddMessage("|cFF00FF00[SmartLoot]|r Configuración guardada manualmente")
-        
+
     elseif cmd == "help" then
         DEFAULT_CHAT_FRAME:AddMessage("|cFF00FF00=== SmartLoot v" .. self.version .. " ===|r")
         DEFAULT_CHAT_FRAME:AddMessage("/sl on - Activar y abrir")
@@ -264,7 +272,7 @@ function SL:HandleCommand(msg)
         DEFAULT_CHAT_FRAME:AddMessage("/sl debug - Modo debug")
         DEFAULT_CHAT_FRAME:AddMessage("/sl reset - Resetear configuración")
         DEFAULT_CHAT_FRAME:AddMessage("/sl save - Guardar manualmente")
-        
+
     else
         DEFAULT_CHAT_FRAME:AddMessage("|cFFFF0000[SmartLoot]|r Comando inválido. Usa /sl help")
     end
@@ -287,10 +295,10 @@ SL.frame:SetScript("OnEvent", function(self, event, arg1)
     if event == "ADDON_LOADED" and arg1 == "SmartLoot" then
         -- Cargar configuración guardada
         SL:LoadConfig()
-        
+
         DEFAULT_CHAT_FRAME:AddMessage("|cFF00FF00[SmartLoot]|r v" .. SL.version .. " Cargado")
         DEFAULT_CHAT_FRAME:AddMessage("|cFFFFFF00[SmartLoot]|r Usa /sl help para comandos")
-        
+
     elseif event == "LOOT_OPENED" then
         if SL.config and SL.config.enabled then
             local waitFrame = CreateFrame("Frame")
@@ -312,7 +320,7 @@ function LootFrame_OnShow(self)
     if originalLootFrame_OnShow then
         originalLootFrame_OnShow(self)
     end
-    
+
     if SmartLoot.config and SmartLoot.config.enabled then
         local waitFrame = CreateFrame("Frame")
         local elapsed = 0
