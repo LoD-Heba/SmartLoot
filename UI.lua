@@ -1,100 +1,180 @@
--- UI.lua - Interfaz gráfica mejorada y responsiva
+-- UI.lua - Interfaz profesional compatible con WoW 3.3.5a
 
 SmartLoot = SmartLoot or {}
 local SL = SmartLoot
 SL.UI = {}
 
 -- ===========================================
--- VENTANA PRINCIPAL (MÁS GRANDE)
+-- COLORES
+-- ===========================================
+
+local COLORS = {
+    primary = {0, 0.8, 0.4},
+    secondary = {0.2, 0.6, 1},
+    success = {0, 0.8, 0.4},
+    warning = {1, 0.7, 0},
+    error = {1, 0.2, 0.2},
+}
+
+-- ===========================================
+-- VENTANA PRINCIPAL
 -- ===========================================
 
 function SL.UI:CreateMainFrame()
     local frame = CreateFrame("Frame", "SmartLootMainFrame", UIParent)
-    frame:SetSize(700, 600)
+    frame:SetSize(850, 600)
     frame:SetPoint("CENTER")
+    frame:SetFrameStrata("HIGH")
     frame:SetBackdrop({
         bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background",
         edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border",
         tile = true, tileSize = 32, edgeSize = 32,
         insets = { left = 8, right = 8, top = 8, bottom = 8 }
     })
+    frame:SetBackdropColor(0.05, 0.05, 0.1, 0.95)
     frame:SetMovable(true)
     frame:EnableMouse(true)
     frame:RegisterForDrag("LeftButton")
     frame:SetScript("OnDragStart", frame.StartMoving)
-    frame:SetScript("OnDragStop", frame.StopMovingOrSizing)
+    frame:SetScript("OnDragStop", function(self)
+        self:StopMovingOrSizing()
+        SL:SaveConfig()
+    end)
     frame:Hide()
     
     self.MainFrame = frame
     
-    -- Título
-    local title = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
-    title:SetPoint("TOP", 0, -15)
-    title:SetText("|cFF00FF00SmartLoot|r v" .. SL.version)
+    -- Header
+    self:CreateHeader(frame)
     
-    -- Botón cerrar
-    local closeBtn = CreateFrame("Button", nil, frame, "UIPanelCloseButton")
-    closeBtn:SetPoint("TOPRIGHT", -5, -5)
+    -- Sidebar
+    self:CreateSidebar(frame)
     
-    -- Estado
-    local statusText = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-    statusText:SetPoint("TOP", 0, -40)
+    -- Content Area
+    self:CreateContentArea(frame)
+    
+    -- Footer
+    self:CreateFooter(frame)
+end
+
+-- ===========================================
+-- HEADER
+-- ===========================================
+
+function SL.UI:CreateHeader(parent)
+    local header = CreateFrame("Frame", nil, parent)
+    header:SetSize(parent:GetWidth() - 16, 60)
+    header:SetPoint("TOP", 0, -8)
+    
+    -- Background
+    local bg = header:CreateTexture(nil, "BACKGROUND")
+    bg:SetAllPoints()
+    bg:SetTexture("Interface\\Tooltips\\UI-Tooltip-Background")
+    bg:SetVertexColor(0.1, 0.1, 0.15, 0.9)
+    
+    -- Icon
+    local icon = header:CreateTexture(nil, "ARTWORK")
+    icon:SetSize(40, 40)
+    icon:SetPoint("LEFT", 15, 0)
+    icon:SetTexture("Interface\\Icons\\INV_Misc_Bag_10")
+    
+    -- Title
+    local title = header:CreateFontString(nil, "OVERLAY", "GameFontNormalHuge")
+    title:SetPoint("LEFT", icon, "RIGHT", 10, 5)
+    title:SetText("SmartLoot")
+    title:SetTextColor(COLORS.primary[1], COLORS.primary[2], COLORS.primary[3])
+    
+    -- Version
+    local version = header:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    version:SetPoint("LEFT", icon, "RIGHT", 10, -12)
+    version:SetText("v" .. SL.version)
+    version:SetTextColor(0.7, 0.7, 0.7)
+    
+    -- Status
+    local statusBg = CreateFrame("Frame", nil, header)
+    statusBg:SetSize(150, 30)
+    statusBg:SetPoint("RIGHT", -130, 0)
+    statusBg:SetBackdrop({
+        bgFile = "Interface\\Tooltips\\UI-Tooltip-Background",
+        edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
+        tile = true, tileSize = 8, edgeSize = 8,
+        insets = { left = 2, right = 2, top = 2, bottom = 2 }
+    })
+    statusBg:SetBackdropColor(0.05, 0.05, 0.08, 0.9)
+    
+    local statusText = statusBg:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    statusText:SetPoint("CENTER")
     self.StatusText = statusText
-    self:UpdateStatus()
     
-    -- Botón ON/OFF más grande
-    local toggleBtn = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
-    toggleBtn:SetSize(150, 35)
-    toggleBtn:SetPoint("TOP", 0, -70)
-    toggleBtn:SetText(SL.config.enabled and "DESACTIVAR" or "ACTIVAR")
+    -- Toggle Button
+    local toggleBtn = CreateFrame("Button", nil, header, "UIPanelButtonTemplate")
+    toggleBtn:SetSize(80, 30)
+    toggleBtn:SetPoint("RIGHT", -15, 0)
+    toggleBtn:SetText("OFF")
     toggleBtn:SetScript("OnClick", function()
         SL.config.enabled = not SL.config.enabled
-        toggleBtn:SetText(SL.config.enabled and "DESACTIVAR" or "ACTIVAR")
-        DEFAULT_CHAT_FRAME:AddMessage(SL.config.enabled and "|cFF00FF00[SmartLoot]|r Activado" or "|cFFFF0000[SmartLoot]|r Desactivado")
         self:UpdateStatus()
         SL:SaveConfig()
     end)
     self.ToggleBtn = toggleBtn
     
-    -- Crear panel de navegación lateral
-    self:CreateSideNavigation(frame)
+    -- Close Button
+    local closeBtn = CreateFrame("Button", nil, header, "UIPanelCloseButton")
+    closeBtn:SetSize(24, 24)
+    closeBtn:SetPoint("TOPRIGHT", parent, "TOPRIGHT", -10, -10)
+    
+    self:UpdateStatus()
 end
 
 function SL.UI:UpdateStatus()
-    if self.StatusText then
-        if SL.config.enabled then
-            self.StatusText:SetText("Estado: |cFF00FF00● ACTIVADO|r")
-        else
-            self.StatusText:SetText("Estado: |cFFFF0000● DESACTIVADO|r")
-        end
+    if not self.StatusText then return end
+    
+    local enabled = SL.config and SL.config.enabled or false
+    self.StatusText:SetText(enabled and "● ACTIVADO" or "● DESACTIVADO")
+    
+    if enabled then
+        self.StatusText:SetTextColor(COLORS.success[1], COLORS.success[2], COLORS.success[3])
+    else
+        self.StatusText:SetTextColor(COLORS.error[1], COLORS.error[2], COLORS.error[3])
+    end
+    
+    if self.ToggleBtn then
+        self.ToggleBtn:SetText(enabled and "ON" or "OFF")
+    end
+    
+    if self.FloatingButton then
+        self:UpdateFloatingButton()
     end
 end
 
 -- ===========================================
--- NAVEGACIÓN LATERAL
+-- SIDEBAR
 -- ===========================================
 
-function SL.UI:CreateSideNavigation(parent)
-    -- Panel lateral
-    local sidePanel = CreateFrame("Frame", nil, parent)
-    sidePanel:SetSize(150, 465)
-    sidePanel:SetPoint("TOPLEFT", 10, -120)
-    sidePanel:SetBackdrop({
-        bgFile = "Interface\\ChatFrame\\ChatFrameBackground",
+function SL.UI:CreateSidebar(parent)
+    local sidebar = CreateFrame("Frame", nil, parent)
+    sidebar:SetSize(180, parent:GetHeight() - 130)
+    sidebar:SetPoint("TOPLEFT", 8, -70)
+    sidebar:SetBackdrop({
+        bgFile = "Interface\\Tooltips\\UI-Tooltip-Background",
         edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
         tile = true, tileSize = 16, edgeSize = 16,
         insets = { left = 3, right = 3, top = 3, bottom = 3 }
     })
-    sidePanel:SetBackdropColor(0, 0, 0, 0.5)
-    sidePanel:SetBackdropBorderColor(0.4, 0.4, 0.4, 1)
+    sidebar:SetBackdropColor(0.1, 0.1, 0.15, 0.9)
     
-    -- Título del panel
-    local sideTitle = sidePanel:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    sideTitle:SetPoint("TOP", 0, -8)
-    sideTitle:SetText("|cFFFFFF00CATEGORÍAS|r")
+    -- ScrollFrame
+    local scrollFrame = CreateFrame("ScrollFrame", nil, sidebar, "UIPanelScrollFrameTemplate")
+    scrollFrame:SetSize(155, sidebar:GetHeight() - 20)
+    scrollFrame:SetPoint("TOPLEFT", 10, -10)
     
-    -- Lista de profesiones
-    local professions = {
+    local scrollChild = CreateFrame("Frame", nil, scrollFrame)
+    scrollChild:SetSize(145, 1)
+    scrollFrame:SetScrollChild(scrollChild)
+    
+    -- Categories
+    local categories = {
+        {type = "header", text = "PROFESIONES"},
         {key = "Tailoring", name = "Sastrería", icon = "Interface\\Icons\\Trade_Tailoring"},
         {key = "Leatherworking", name = "Peletería", icon = "Interface\\Icons\\Trade_LeatherWorking"},
         {key = "Fishing", name = "Pesca", icon = "Interface\\Icons\\Trade_Fishing"},
@@ -103,258 +183,253 @@ function SL.UI:CreateSideNavigation(parent)
         {key = "Mining", name = "Minería", icon = "Interface\\Icons\\Trade_Mining"},
         {key = "Herbalism", name = "Herboristería", icon = "Interface\\Icons\\Trade_Herbalism"},
         {key = "General", name = "General", icon = "Interface\\Icons\\INV_Misc_Bag_08"},
+        {type = "separator"},
+        {type = "header", text = "CONFIGURACIÓN"},
+        {key = "options", name = "Opciones", icon = "Interface\\Icons\\INV_Misc_Gear_01"},
+        {key = "ignored", name = "Ignorados", icon = "Interface\\Icons\\Ability_Rogue_FeignDeath"},
     }
     
     local buttons = {}
-    local yOffset = -30
+    local yOffset = -5
     
-    for i, prof in ipairs(professions) do
-        local btn = CreateFrame("Button", nil, sidePanel)
-        btn:SetSize(140, 35)
-        btn:SetPoint("TOP", 0, yOffset)
-        
-        -- Background del botón
-        local bg = btn:CreateTexture(nil, "BACKGROUND")
-        bg:SetAllPoints()
-        bg:SetTexture("Interface\\Buttons\\UI-Listbox-Highlight")
-        bg:SetAlpha(0)
-        btn.bg = bg
-        
-        -- Icono
-        local icon = btn:CreateTexture(nil, "ARTWORK")
-        icon:SetSize(24, 24)
-        icon:SetPoint("LEFT", 8, 0)
-        icon:SetTexture(prof.icon)
-        
-        -- Texto
-        local text = btn:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-        text:SetPoint("LEFT", icon, "RIGHT", 8, 0)
-        text:SetText(prof.name)
-        btn.text = text
-        
-        btn.professionKey = prof.key
-        table.insert(buttons, btn)
-        
-        yOffset = yOffset - 40
+    for _, cat in ipairs(categories) do
+        if cat.type == "header" then
+            local header = scrollChild:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+            header:SetPoint("TOPLEFT", 5, yOffset)
+            header:SetText(cat.text)
+            header:SetTextColor(0.7, 0.7, 0.7)
+            yOffset = yOffset - 25
+        elseif cat.type == "separator" then
+            local line = scrollChild:CreateTexture(nil, "ARTWORK")
+            line:SetSize(135, 1)
+            line:SetPoint("TOP", 0, yOffset)
+            line:SetTexture("Interface\\Tooltips\\UI-Tooltip-Background")
+            line:SetVertexColor(0.5, 0.5, 0.5, 0.8)
+            yOffset = yOffset - 15
+        else
+            local btn = self:CreateNavButton(scrollChild, cat)
+            btn:SetPoint("TOP", 0, yOffset)
+            btn.categoryKey = cat.key
+            table.insert(buttons, btn)
+            yOffset = yOffset - 38
+        end
     end
     
-    -- Separador
-    yOffset = yOffset - 5
-    local separator = sidePanel:CreateTexture(nil, "ARTWORK")
-    separator:SetSize(130, 1)
-    separator:SetPoint("TOP", 0, yOffset)
-    separator:SetColorTexture(0.5, 0.5, 0.5, 0.8)
+    scrollChild:SetHeight(math.abs(yOffset) + 10)
     
-    yOffset = yOffset - 15
+    self.NavButtons = buttons
+    self.Sidebar = sidebar
+end
+
+function SL.UI:CreateNavButton(parent, category)
+    local btn = CreateFrame("Button", nil, parent)
+    btn:SetSize(135, 34)
     
-    -- Botones especiales
-    local specialButtons = {
-        {name = "Opciones", icon = "Interface\\Icons\\INV_Misc_Gear_01", content = "options"},
-        {name = "Ignorados", icon = "Interface\\Icons\\Ability_Rogue_FeignDeath", content = "ignored"},
-    }
+    -- Background
+    local bg = btn:CreateTexture(nil, "BACKGROUND")
+    bg:SetAllPoints()
+    bg:SetTexture("Interface\\Tooltips\\UI-Tooltip-Background")
+    bg:SetVertexColor(0, 0, 0, 0)
+    btn.bg = bg
     
-    for i, special in ipairs(specialButtons) do
-        local btn = CreateFrame("Button", nil, sidePanel)
-        btn:SetSize(140, 35)
-        btn:SetPoint("TOP", 0, yOffset)
+    -- Icon
+    local icon = btn:CreateTexture(nil, "ARTWORK")
+    icon:SetSize(24, 24)
+    icon:SetPoint("LEFT", 8, 0)
+    icon:SetTexture(category.icon)
+    
+    -- Text
+    local text = btn:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    text:SetPoint("LEFT", icon, "RIGHT", 8, 0)
+    text:SetText(category.name)
+    text:SetWidth(90)
+    text:SetJustifyH("LEFT")
+    btn.text = text
+    
+    -- Hover
+    btn:SetScript("OnEnter", function(self)
+        if not self.selected then
+            bg:SetVertexColor(0.15, 0.15, 0.2, 1)
+        end
+    end)
+    
+    btn:SetScript("OnLeave", function(self)
+        if not self.selected then
+            bg:SetVertexColor(0, 0, 0, 0)
+        end
+    end)
+    
+    return btn
+end
+
+function SL.UI:SelectCategory(key)
+    -- Update buttons
+    for _, btn in ipairs(self.NavButtons or {}) do
+        local isSelected = btn.categoryKey == key
+        btn.selected = isSelected
         
-        local bg = btn:CreateTexture(nil, "BACKGROUND")
-        bg:SetAllPoints()
-        bg:SetTexture("Interface\\Buttons\\UI-Listbox-Highlight")
-        bg:SetAlpha(0)
-        btn.bg = bg
-        
-        local icon = btn:CreateTexture(nil, "ARTWORK")
-        icon:SetSize(24, 24)
-        icon:SetPoint("LEFT", 8, 0)
-        icon:SetTexture(special.icon)
-        
-        local text = btn:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-        text:SetPoint("LEFT", icon, "RIGHT", 8, 0)
-        text:SetText(special.name)
-        btn.text = text
-        
-        btn.contentType = special.content
-        table.insert(buttons, btn)
-        
-        yOffset = yOffset - 40
+        if isSelected then
+            btn.bg:SetVertexColor(0.1, 0.4, 0.2, 0.8)
+            btn.text:SetTextColor(COLORS.primary[1], COLORS.primary[2], COLORS.primary[3])
+        else
+            btn.bg:SetVertexColor(0, 0, 0, 0)
+            btn.text:SetTextColor(1, 1, 1)
+        end
     end
     
-    -- Área de contenido
-    local contentArea = CreateFrame("Frame", nil, parent)
-    contentArea:SetSize(520, 465)
-    contentArea:SetPoint("TOPLEFT", sidePanel, "TOPRIGHT", 10, 0)
-    contentArea:SetBackdrop({
-        bgFile = "Interface\\ChatFrame\\ChatFrameBackground",
+    -- Show content
+    if self.Contents then
+        for k, content in pairs(self.Contents) do
+            content:Hide()
+        end
+        if self.Contents[key] then
+            self.Contents[key]:Show()
+        end
+    end
+end
+
+-- ===========================================
+-- CONTENT AREA
+-- ===========================================
+
+function SL.UI:CreateContentArea(parent)
+    local content = CreateFrame("Frame", nil, parent)
+    content:SetSize(parent:GetWidth() - 215, parent:GetHeight() - 130)
+    content:SetPoint("TOPLEFT", 195, -70)
+    content:SetBackdrop({
+        bgFile = "Interface\\Tooltips\\UI-Tooltip-Background",
         edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
         tile = true, tileSize = 16, edgeSize = 16,
         insets = { left = 3, right = 3, top = 3, bottom = 3 }
     })
-    contentArea:SetBackdropColor(0, 0, 0, 0.3)
-    contentArea:SetBackdropBorderColor(0.4, 0.4, 0.4, 1)
+    content:SetBackdropColor(0.08, 0.08, 0.12, 0.9)
     
-    self.ContentArea = contentArea
-    self.NavButtons = buttons
-    
-    -- Crear todos los contenidos
+    self.ContentArea = content
     self.Contents = {}
+    
+    -- Create all contents
+    local professions = {"Tailoring", "Leatherworking", "Fishing", "Cooking", "Blacksmithing", "Mining", "Herbalism", "General"}
     for _, prof in ipairs(professions) do
-        self.Contents[prof.key] = self:CreateProfessionContent(contentArea, prof.key)
+        self.Contents[prof] = self:CreateProfessionContent(content, prof)
     end
-    self.Contents["options"] = self:CreateOptionsContent(contentArea)
-    self.Contents["ignored"] = self:CreateIgnoredContent(contentArea)
+    self.Contents["options"] = self:CreateOptionsContent(content)
+    self.Contents["ignored"] = self:CreateIgnoredContent(content)
     
-    -- Función para seleccionar contenido
-    local function SelectContent(key)
-        -- Ocultar todos los contenidos
-        for k, content in pairs(self.Contents) do
-            content:Hide()
-        end
-        
-        -- Mostrar el seleccionado
-        if self.Contents[key] then
-            self.Contents[key]:Show()
-        end
-        
-        -- Actualizar botones
-        for _, btn in ipairs(buttons) do
-            local isSelected = (btn.professionKey == key) or (btn.contentType == key)
-            btn.bg:SetAlpha(isSelected and 0.3 or 0)
-            if isSelected then
-                btn.text:SetFontObject("GameFontHighlight")
-            else
-                btn.text:SetFontObject("GameFontNormal")
-            end
-        end
-    end
-    
-    -- Asignar clicks
-    for _, btn in ipairs(buttons) do
+    -- Setup navigation
+    for _, btn in ipairs(self.NavButtons or {}) do
         btn:SetScript("OnClick", function(self)
-            local key = self.professionKey or self.contentType
-            SelectContent(key)
-        end)
-        
-        btn:SetScript("OnEnter", function(self)
-            if not ((self.professionKey and self.professionKey == self.selectedKey) or 
-                    (self.contentType and self.contentType == self.selectedKey)) then
-                self.bg:SetAlpha(0.15)
-            end
-        end)
-        
-        btn:SetScript("OnLeave", function(self)
-            if not ((self.professionKey and self.professionKey == self.selectedKey) or 
-                    (self.contentType and self.contentType == self.selectedKey)) then
-                self.bg:SetAlpha(0)
-            end
+            SL.UI:SelectCategory(self.categoryKey)
         end)
     end
     
-    -- Seleccionar primera profesión por defecto
-    SelectContent("Tailoring")
+    -- Select first category
+    self:SelectCategory("Tailoring")
 end
 
 -- ===========================================
--- CONTENIDO POR PROFESIÓN
+-- PROFESSION CONTENT
 -- ===========================================
 
-function SL.UI:CreateProfessionContent(parent, professionKey)
+function SL.UI:CreateProfessionContent(parent, profKey)
     local content = CreateFrame("Frame", nil, parent)
     content:SetAllPoints()
     content:Hide()
     
-    local prof = SL.ItemDatabase[professionKey]
+    local prof = SL.ItemDatabase[profKey]
     if not prof then return content end
     
-    -- Encabezado con icono y título
+    -- Header
     local header = CreateFrame("Frame", nil, content)
-    header:SetSize(500, 50)
-    header:SetPoint("TOP", 0, -10)
+    header:SetSize(parent:GetWidth() - 40, 50)
+    header:SetPoint("TOP", 0, -15)
     
     local icon = header:CreateTexture(nil, "ARTWORK")
-    icon:SetSize(40, 40)
+    icon:SetSize(36, 36)
     icon:SetPoint("LEFT", 10, 0)
     icon:SetTexture(prof.icon)
     
-    local title = header:CreateFontString(nil, "OVERLAY", "GameFontNormalHuge")
+    local title = header:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
     title:SetPoint("LEFT", icon, "RIGHT", 10, 0)
     title:SetText(prof.name)
+    title:SetTextColor(COLORS.primary[1], COLORS.primary[2], COLORS.primary[3])
     
-    -- Botones de acción
-    local btnY = -70
+    local line = header:CreateTexture(nil, "ARTWORK")
+    line:SetSize(parent:GetWidth() - 60, 2)
+    line:SetPoint("BOTTOM", 0, 0)
+    line:SetTexture("Interface\\Tooltips\\UI-Tooltip-Background")
+    line:SetVertexColor(COLORS.primary[1] * 0.5, COLORS.primary[2] * 0.5, COLORS.primary[3] * 0.5, 0.6)
     
-    local selectAllBtn = CreateFrame("Button", nil, content, "UIPanelButtonTemplate")
-    selectAllBtn:SetSize(110, 25)
-    selectAllBtn:SetPoint("TOPLEFT", 15, btnY)
+    -- Action buttons
+    local btnContainer = CreateFrame("Frame", nil, content)
+    btnContainer:SetSize(parent:GetWidth() - 40, 35)
+    btnContainer:SetPoint("TOP", 0, -75)
+    
+    local selectAllBtn = CreateFrame("Button", nil, btnContainer, "UIPanelButtonTemplate")
+    selectAllBtn:SetSize(110, 28)
+    selectAllBtn:SetPoint("LEFT", 0, 0)
     selectAllBtn:SetText("Marcar Todos")
     selectAllBtn:SetScript("OnClick", function()
         for itemID, item in pairs(prof.items) do
             item.enabled = true
         end
-        self:RefreshProfessionContent(professionKey)
+        self:RefreshProfessionContent(profKey)
         SL:SaveConfig()
-        DEFAULT_CHAT_FRAME:AddMessage("|cFF00FF00[SmartLoot]|r Todos marcados en " .. prof.name)
     end)
     
-    local deselectAllBtn = CreateFrame("Button", nil, content, "UIPanelButtonTemplate")
-    deselectAllBtn:SetSize(130, 25)
+    local deselectAllBtn = CreateFrame("Button", nil, btnContainer, "UIPanelButtonTemplate")
+    deselectAllBtn:SetSize(130, 28)
     deselectAllBtn:SetPoint("LEFT", selectAllBtn, "RIGHT", 5, 0)
     deselectAllBtn:SetText("Desmarcar Todos")
     deselectAllBtn:SetScript("OnClick", function()
         for itemID, item in pairs(prof.items) do
             item.enabled = false
         end
-        self:RefreshProfessionContent(professionKey)
+        self:RefreshProfessionContent(profKey)
         SL:SaveConfig()
-        DEFAULT_CHAT_FRAME:AddMessage("|cFF00FF00[SmartLoot]|r Todos desmarcados en " .. prof.name)
     end)
     
-    local addItemBtn = CreateFrame("Button", nil, content, "UIPanelButtonTemplate")
-    addItemBtn:SetSize(120, 25)
-    addItemBtn:SetPoint("LEFT", deselectAllBtn, "RIGHT", 5, 0)
-    addItemBtn:SetText("+ Añadir Item")
-    addItemBtn:SetScript("OnClick", function()
-        self:ShowAddItemDialog(professionKey)
+    local addBtn = CreateFrame("Button", nil, btnContainer, "UIPanelButtonTemplate")
+    addBtn:SetSize(110, 28)
+    addBtn:SetPoint("LEFT", deselectAllBtn, "RIGHT", 5, 0)
+    addBtn:SetText("+ Añadir Item")
+    addBtn:SetScript("OnClick", function()
+        self:ShowAddItemDialog(profKey)
     end)
     
-    -- ScrollFrame para los items (MÁS GRANDE)
+    -- ScrollFrame
     local scrollFrame = CreateFrame("ScrollFrame", nil, content, "UIPanelScrollFrameTemplate")
-    scrollFrame:SetSize(490, 350)
-    scrollFrame:SetPoint("TOP", 0, -105)
+    scrollFrame:SetSize(parent:GetWidth() - 50, parent:GetHeight() - 145)
+    scrollFrame:SetPoint("TOP", 0, -120)
     
     local scrollChild = CreateFrame("Frame", nil, scrollFrame)
-    scrollChild:SetSize(470, 1)
+    scrollChild:SetSize(parent:GetWidth() - 70, 1)
     scrollFrame:SetScrollChild(scrollChild)
     
     content.scrollChild = scrollChild
-    content.professionKey = professionKey
+    content.professionKey = profKey
     
-    self:RefreshProfessionContent(professionKey)
+    self:RefreshProfessionContent(profKey)
     
     return content
 end
 
-function SL.UI:RefreshProfessionContent(professionKey)
-    -- Buscar el content frame
-    local content = self.Contents[professionKey]
+function SL.UI:RefreshProfessionContent(profKey)
+    local content = self.Contents[profKey]
     if not content or not content.scrollChild then return end
     
     local scrollChild = content.scrollChild
     
-    -- Limpiar items anteriores
+    -- Clear
     local children = {scrollChild:GetChildren()}
     for _, child in ipairs(children) do
         child:Hide()
         child:SetParent(nil)
     end
     
-    local prof = SL.ItemDatabase[professionKey]
+    local prof = SL.ItemDatabase[profKey]
     if not prof then return end
     
-    local yOffset = -5
-    local count = 0
-    
-    -- Ordenar items por nombre
+    -- Sort items
     local sortedItems = {}
     for itemID, item in pairs(prof.items) do
         table.insert(sortedItems, {id = itemID, data = item})
@@ -363,35 +438,39 @@ function SL.UI:RefreshProfessionContent(professionKey)
         return (a.data.name or "") < (b.data.name or "")
     end)
     
-    for _, itemEntry in ipairs(sortedItems) do
-        local itemID = itemEntry.id
-        local item = itemEntry.data
+    local yOffset = -10
+    local count = 0
+    
+    for _, entry in ipairs(sortedItems) do
+        local itemID = entry.id
+        local item = entry.data
         
         local row = CreateFrame("Frame", nil, scrollChild)
-        row:SetSize(460, 30)
+        row:SetSize(scrollChild:GetWidth(), 36)
         row:SetPoint("TOP", 0, yOffset)
         
-        -- Background alternado
+        -- Background
         if count % 2 == 0 then
             local bg = row:CreateTexture(nil, "BACKGROUND")
             bg:SetAllPoints()
-            bg:SetColorTexture(0.1, 0.1, 0.1, 0.3)
+            bg:SetTexture("Interface\\Tooltips\\UI-Tooltip-Background")
+            bg:SetVertexColor(0.1, 0.1, 0.15, 0.4)
         end
         
         -- Checkbox
         local cb = CreateFrame("CheckButton", nil, row, "UICheckButtonTemplate")
-        cb:SetPoint("LEFT", 5, 0)
-        cb:SetSize(26, 26)
+        cb:SetPoint("LEFT", 10, 0)
+        cb:SetSize(24, 24)
         cb:SetChecked(item.enabled)
         cb:SetScript("OnClick", function(self)
             item.enabled = self:GetChecked()
             SL:SaveConfig()
         end)
         
-        -- Icono del item
+        -- Icon
         local icon = row:CreateTexture(nil, "ARTWORK")
-        icon:SetSize(24, 24)
-        icon:SetPoint("LEFT", cb, "RIGHT", 5, 0)
+        icon:SetSize(28, 28)
+        icon:SetPoint("LEFT", cb, "RIGHT", 10, 0)
         
         local itemName, itemLink, _, _, _, _, _, _, _, itemTexture = GetItemInfo(itemID)
         if itemTexture then
@@ -400,68 +479,59 @@ function SL.UI:RefreshProfessionContent(professionKey)
             icon:SetTexture("Interface\\Icons\\INV_Misc_QuestionMark")
         end
         
-        -- Nombre del item (con link si está disponible)
-        local text = row:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-        text:SetPoint("LEFT", icon, "RIGHT", 8, 0)
-        text:SetWidth(300)
+        -- Name
+        local text = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+        text:SetPoint("LEFT", icon, "RIGHT", 10, 0)
+        text:SetWidth(350)
         text:SetJustifyH("LEFT")
-        
         if itemLink then
             text:SetText(itemLink)
         else
             text:SetText(item.name or ("|cFFFF0000ID: " .. itemID .. "|r"))
         end
         
-        -- Botón eliminar (solo para items custom)
+        -- Delete button for custom items
         if item.custom then
             local deleteBtn = CreateFrame("Button", nil, row, "UIPanelButtonTemplate")
-            deleteBtn:SetSize(70, 22)
-            deleteBtn:SetPoint("RIGHT", -5, 0)
+            deleteBtn:SetSize(70, 24)
+            deleteBtn:SetPoint("RIGHT", -10, 0)
             deleteBtn:SetText("Eliminar")
             deleteBtn:SetScript("OnClick", function()
-                SL:RemoveCustomItem(professionKey, itemID)
-                self:RefreshProfessionContent(professionKey)
+                SL:RemoveCustomItem(profKey, itemID)
+                self:RefreshProfessionContent(profKey)
                 SL:SaveConfig()
-                DEFAULT_CHAT_FRAME:AddMessage("|cFF00FF00[SmartLoot]|r Item eliminado: " .. (itemName or itemID))
             end)
         end
         
-        yOffset = yOffset - 32
+        yOffset = yOffset - 38
         count = count + 1
     end
     
     if count == 0 then
         local emptyText = scrollChild:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
-        emptyText:SetPoint("TOP", 0, -100)
-        emptyText:SetText("|cFFAAAAAA(No hay items configurados)|r")
-        
-        local hint = scrollChild:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-        hint:SetPoint("TOP", 0, -130)
-        hint:SetWidth(400)
-        hint:SetText("|cFFAAAAAAUsa el botón '+ Añadir Item' para agregar items personalizados|r")
+        emptyText:SetPoint("CENTER", 0, -50)
+        emptyText:SetText("|cFF888888No hay items configurados|r")
     end
     
-    scrollChild:SetHeight(math.max(350, count * 32 + 10))
+    scrollChild:SetHeight(math.max(350, count * 38 + 20))
 end
 
 -- ===========================================
--- DIÁLOGO PARA AÑADIR ITEMS
+-- ADD ITEM DIALOG (continúa en siguiente parte...)
 -- ===========================================
 
-function SL.UI:ShowAddItemDialog(professionKey)
-    -- Si ya existe el diálogo, mostrarlo
+function SL.UI:ShowAddItemDialog(profKey)
     if self.AddItemDialog then
         self.AddItemDialog:Show()
-        self.AddItemDialog.professionKey = professionKey
+        self.AddItemDialog.professionKey = profKey
         self.AddItemDialog.editBoxID:SetText("")
         self.AddItemDialog.editBoxName:SetText("")
         self.AddItemDialog.editBoxID:SetFocus()
         return
     end
     
-    -- Crear diálogo
     local dialog = CreateFrame("Frame", "SmartLootAddItemDialog", UIParent)
-    dialog:SetSize(400, 250)
+    dialog:SetSize(420, 260)
     dialog:SetPoint("CENTER")
     dialog:SetBackdrop({
         bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background",
@@ -469,65 +539,57 @@ function SL.UI:ShowAddItemDialog(professionKey)
         tile = true, tileSize = 32, edgeSize = 32,
         insets = { left = 8, right = 8, top = 8, bottom = 8 }
     })
+    dialog:SetBackdropColor(0.05, 0.05, 0.1, 0.95)
     dialog:SetMovable(true)
     dialog:EnableMouse(true)
     dialog:RegisterForDrag("LeftButton")
     dialog:SetScript("OnDragStart", dialog.StartMoving)
     dialog:SetScript("OnDragStop", dialog.StopMovingOrSizing)
     dialog:SetFrameStrata("DIALOG")
-    dialog.professionKey = professionKey
+    dialog.professionKey = profKey
     
     self.AddItemDialog = dialog
     
-    -- Título
+    -- Title
     local title = dialog:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
     title:SetPoint("TOP", 0, -20)
     title:SetText("|cFF00FF00Añadir Item Personalizado|r")
     
-    -- Instrucciones
+    -- Instructions
     local instructions = dialog:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
     instructions:SetPoint("TOP", 0, -55)
-    instructions:SetWidth(370)
+    instructions:SetWidth(380)
     instructions:SetJustifyH("LEFT")
-    instructions:SetText("1. Activa 'Mostrar ID en tooltips' en Opciones\n2. Pasa el ratón sobre el item que quieres añadir\n3. Copia el ID que aparece y pégalo aquí")
+    instructions:SetText("1. Activa 'Mostrar ID en tooltips' en Opciones\n2. Pasa el ratón sobre el item\n3. Copia el ID y pégalo aquí")
     
-    -- Label Item ID
+    -- Item ID input
     local labelID = dialog:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    labelID:SetPoint("TOPLEFT", 30, -115)
+    labelID:SetPoint("TOPLEFT", 30, -120)
     labelID:SetText("Item ID:")
     
-    -- EditBox para Item ID
     local editBoxID = CreateFrame("EditBox", nil, dialog, "InputBoxTemplate")
     editBoxID:SetSize(120, 35)
-    editBoxID:SetPoint("TOPLEFT", 110, -110)
+    editBoxID:SetPoint("LEFT", labelID, "RIGHT", 10, 0)
     editBoxID:SetAutoFocus(false)
     editBoxID:SetMaxLetters(10)
     editBoxID:SetNumeric(true)
-    editBoxID:SetScript("OnEnterPressed", function(self)
-        dialog.editBoxName:SetFocus()
-    end)
     dialog.editBoxID = editBoxID
     
-    -- Label Nombre (opcional)
+    -- Item Name input
     local labelName = dialog:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    labelName:SetPoint("TOPLEFT", 30, -155)
+    labelName:SetPoint("TOPLEFT", 30, -160)
     labelName:SetText("Nombre (opcional):")
     
-    -- EditBox para Nombre
     local editBoxName = CreateFrame("EditBox", nil, dialog, "InputBoxTemplate")
     editBoxName:SetSize(250, 35)
-    editBoxName:SetPoint("TOPLEFT", 30, -175)
+    editBoxName:SetPoint("TOPLEFT", 30, -180)
     editBoxName:SetAutoFocus(false)
     editBoxName:SetMaxLetters(50)
-    editBoxName:SetScript("OnEnterPressed", function()
-        -- Ejecutar añadir cuando se presiona Enter
-        dialog.addBtn:Click()
-    end)
     dialog.editBoxName = editBoxName
     
-    -- Botón Añadir
+    -- Buttons
     local addBtn = CreateFrame("Button", nil, dialog, "UIPanelButtonTemplate")
-    addBtn:SetSize(120, 35)
+    addBtn:SetSize(110, 32)
     addBtn:SetPoint("BOTTOMLEFT", 30, 20)
     addBtn:SetText("Añadir")
     addBtn:SetScript("OnClick", function()
@@ -535,11 +597,10 @@ function SL.UI:ShowAddItemDialog(professionKey)
         local itemName = editBoxName:GetText()
         
         if not itemID then
-            DEFAULT_CHAT_FRAME:AddMessage("|cFFFF0000[SmartLoot]|r Debes ingresar un Item ID válido")
+            DEFAULT_CHAT_FRAME:AddMessage("|cFFFF0000[SmartLoot]|r Ingresa un Item ID válido")
             return
         end
         
-        -- Si no hay nombre, intentar obtenerlo del juego
         if not itemName or itemName == "" then
             local name = GetItemInfo(itemID)
             itemName = name or ("Item ID: " .. itemID)
@@ -553,30 +614,28 @@ function SL.UI:ShowAddItemDialog(professionKey)
             editBoxName:SetText("")
             dialog:Hide()
         else
-            DEFAULT_CHAT_FRAME:AddMessage("|cFFFF0000[SmartLoot]|r El item ya existe en esta categoría")
+            DEFAULT_CHAT_FRAME:AddMessage("|cFFFF0000[SmartLoot]|r El item ya existe")
         end
     end)
     dialog.addBtn = addBtn
     
-    -- Botón Cancelar
     local cancelBtn = CreateFrame("Button", nil, dialog, "UIPanelButtonTemplate")
-    cancelBtn:SetSize(120, 35)
+    cancelBtn:SetSize(110, 32)
     cancelBtn:SetPoint("BOTTOMRIGHT", -30, 20)
     cancelBtn:SetText("Cancelar")
     cancelBtn:SetScript("OnClick", function()
         dialog:Hide()
     end)
     
-    -- Botón cerrar
     local closeBtn = CreateFrame("Button", nil, dialog, "UIPanelCloseButton")
+    closeBtn:SetSize(24, 24)
     closeBtn:SetPoint("TOPRIGHT", -5, -5)
     
-    -- Hacer foco en el primer campo
     editBoxID:SetFocus()
 end
 
 -- ===========================================
--- TAB DE OPCIONES GENERALES
+-- OPTIONS CONTENT
 -- ===========================================
 
 function SL.UI:CreateOptionsContent(parent)
@@ -584,40 +643,56 @@ function SL.UI:CreateOptionsContent(parent)
     content:SetAllPoints()
     content:Hide()
     
-    -- Título
-    local title = content:CreateFontString(nil, "OVERLAY", "GameFontNormalHuge")
-    title:SetPoint("TOP", 0, -20)
+    -- Header
+    local header = CreateFrame("Frame", nil, content)
+    header:SetSize(parent:GetWidth() - 40, 50)
+    header:SetPoint("TOP", 0, -15)
+    
+    local icon = header:CreateTexture(nil, "ARTWORK")
+    icon:SetSize(36, 36)
+    icon:SetPoint("LEFT", 10, 0)
+    icon:SetTexture("Interface\\Icons\\INV_Misc_Gear_01")
+    
+    local title = header:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+    title:SetPoint("LEFT", icon, "RIGHT", 10, 0)
     title:SetText("Opciones Generales")
+    title:SetTextColor(COLORS.primary[1], COLORS.primary[2], COLORS.primary[3])
+    
+    local line = header:CreateTexture(nil, "ARTWORK")
+    line:SetSize(parent:GetWidth() - 60, 2)
+    line:SetPoint("BOTTOM", 0, 0)
+    line:SetTexture("Interface\\Tooltips\\UI-Tooltip-Background")
+    line:SetVertexColor(COLORS.primary[1] * 0.5, COLORS.primary[2] * 0.5, COLORS.primary[3] * 0.5, 0.6)
     
     -- ScrollFrame
     local scrollFrame = CreateFrame("ScrollFrame", nil, content, "UIPanelScrollFrameTemplate")
-    scrollFrame:SetSize(490, 380)
-    scrollFrame:SetPoint("TOP", 0, -60)
+    scrollFrame:SetSize(parent:GetWidth() - 50, parent:GetHeight() - 90)
+    scrollFrame:SetPoint("TOP", 0, -75)
     
     local scrollChild = CreateFrame("Frame", nil, scrollFrame)
-    scrollChild:SetSize(470, 1)
+    scrollChild:SetSize(parent:GetWidth() - 70, 1)
     scrollFrame:SetScrollChild(scrollChild)
     
     local yOffset = -10
     
     local function CreateCheckbox(label, description, configKey)
         local container = CreateFrame("Frame", nil, scrollChild)
-        container:SetSize(460, 45)
+        container:SetSize(scrollChild:GetWidth() - 20, 50)
         container:SetPoint("TOP", 0, yOffset)
         
         local cb = CreateFrame("CheckButton", nil, container, "UICheckButtonTemplate")
-        cb:SetPoint("TOPLEFT", 10, -5)
+        cb:SetPoint("LEFT", 15, 5)
         cb:SetSize(26, 26)
         cb:SetChecked(SL.config[configKey])
         
-        local text = container:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-        text:SetPoint("LEFT", cb, "RIGHT", 5, 8)
+        local text = container:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+        text:SetPoint("LEFT", cb, "RIGHT", 10, 8)
         text:SetText(label)
         
         if description then
             local desc = container:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-            desc:SetPoint("TOPLEFT", cb, "RIGHT", 5, -8)
-            desc:SetWidth(420)
+            desc:SetPoint("TOPLEFT", cb, "RIGHT", 10, -10)
+            desc:SetWidth(scrollChild:GetWidth() - 80)
             desc:SetJustifyH("LEFT")
             desc:SetTextColor(0.7, 0.7, 0.7)
             desc:SetText(description)
@@ -628,73 +703,71 @@ function SL.UI:CreateOptionsContent(parent)
             SL:SaveConfig()
         end)
         
-        yOffset = yOffset - 50
+        yOffset = yOffset - 55
         return cb
     end
     
-    local function CreateSectionHeader(text)
-        local header = scrollChild:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-        header:SetPoint("TOPLEFT", 10, yOffset)
-        header:SetText("|cFFFFFF00" .. text .. "|r")
-        yOffset = yOffset - 30
-    end
-    
-    local function CreateSeparator()
+    local function CreateSectionTitle(text)
+        local title = scrollChild:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+        title:SetPoint("TOPLEFT", 15, yOffset)
+        title:SetText(text)
+        title:SetTextColor(COLORS.primary[1], COLORS.primary[2], COLORS.primary[3])
+        
         local line = scrollChild:CreateTexture(nil, "ARTWORK")
-        line:SetSize(450, 1)
-        line:SetPoint("TOP", 0, yOffset)
-        line:SetColorTexture(0.5, 0.5, 0.5, 0.5)
-        yOffset = yOffset - 15
+        line:SetSize(scrollChild:GetWidth() - 30, 1)
+        line:SetPoint("TOPLEFT", 15, yOffset - 20)
+        line:SetTexture("Interface\\Tooltips\\UI-Tooltip-Background")
+        line:SetVertexColor(COLORS.primary[1] * 0.5, COLORS.primary[2] * 0.5, COLORS.primary[3] * 0.5, 0.5)
+        
+        yOffset = yOffset - 35
     end
     
-    -- Sección: Filtros por Calidad
-    CreateSectionHeader("FILTROS POR CALIDAD")
+    -- Quality Filters
+    CreateSectionTitle("FILTROS POR CALIDAD")
     CreateCheckbox("Recetas", "Recoger todas las recetas automáticamente", "lootRecipes")
-    CreateCheckbox("Items Verdes", "Recoger todos los items de calidad verde (poco común)", "lootGreenAny")
-    CreateCheckbox("Items Azules (67-80)", "Recoger items azules de nivel 67 a 80", "lootBlue67to80")
-    CreateCheckbox("Items Morados (67-80)", "Recoger items morados de nivel 67 a 80", "lootPurple67to80")
+    CreateCheckbox("Items Verdes", "Recoger todos los items de calidad verde", "lootGreenAny")
+    CreateCheckbox("Items Azules (67-80)", "Recoger items azules entre nivel 67 y 80", "lootBlue67to80")
+    CreateCheckbox("Items Morados (67-80)", "Recoger items morados entre nivel 67 y 80", "lootPurple67to80")
     
-    CreateSeparator()
+    yOffset = yOffset - 10
     
-    -- Sección: Tipos Especiales
-    CreateSectionHeader("TIPOS ESPECIALES")
+    -- Special Types
+    CreateSectionTitle("TIPOS ESPECIALES")
     CreateCheckbox("Objetos de Misiones", "Recoger automáticamente items de misiones", "lootQuestItems")
-    CreateCheckbox("Monedas", "Recoger cobre, plata y oro automáticamente", "lootMoney")
+    CreateCheckbox("Monedas", "Recoger cobre, plata y oro", "lootMoney")
     CreateCheckbox("Ignorar Items Grises", "No recoger items de calidad gris (basura)", "ignoreGrey")
     
-    CreateSeparator()
+    yOffset = yOffset - 10
     
-    -- Sección: Interfaz
-    CreateSectionHeader("INTERFAZ Y NOTIFICACIONES")
-    CreateCheckbox("Mostrar ID en Tooltips", "Muestra el ID de items al pasar el ratón (útil para añadir items)", "showItemID")
+    -- Interface
+    CreateSectionTitle("INTERFAZ Y NOTIFICACIONES")
+    CreateCheckbox("Mostrar ID en Tooltips", "Ver ID de items al pasar el ratón", "showItemID")
     CreateCheckbox("Mensajes en Chat", "Mostrar mensajes cuando se recoge un item", "showMessages")
-    CreateCheckbox("Modo Debug", "Mostrar información detallada de depuración", "debugMode")
+    CreateCheckbox("Modo Debug", "Información detallada de depuración", "debugMode")
     
-    CreateSeparator()
     yOffset = yOffset - 10
     
-    -- Información adicional
-    local info = scrollChild:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    info:SetPoint("TOP", 0, yOffset)
-    info:SetWidth(450)
-    info:SetJustifyH("LEFT")
-    info:SetText("|cFFFFFF00Calidades en World of Warcraft:|r\n\n" ..
-                 "|cFF9D9D9D0 - Pobre (Gris)|r\n" ..
-                 "|cFFFFFFFF1 - Común (Blanco)|r\n" ..
-                 "|cFF1EFF002 - Poco común (Verde)|r\n" ..
-                 "|cFF0070DD3 - Raro (Azul)|r\n" ..
-                 "|cFFA335EE4 - Épico (Morado)|r\n" ..
-                 "|cFFFF80005 - Legendario (Naranja)|r")
-    yOffset = yOffset - 140
+    -- Quality reference
+    CreateSectionTitle("REFERENCIA DE CALIDADES")
+    local qualityInfo = scrollChild:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    qualityInfo:SetPoint("TOPLEFT", 15, yOffset)
+    qualityInfo:SetWidth(scrollChild:GetWidth() - 30)
+    qualityInfo:SetJustifyH("LEFT")
+    qualityInfo:SetText(
+        "|cFF9D9D9D0 - Pobre (Gris)|r\n" ..
+        "|cFFFFFFFF1 - Común (Blanco)|r\n" ..
+        "|cFF1EFF002 - Poco común (Verde)|r\n" ..
+        "|cFF0070DD3 - Raro (Azul)|r\n" ..
+        "|cFFA335EE4 - Épico (Morado)|r\n" ..
+        "|cFFFF80005 - Legendario (Naranja)|r"
+    )
+    yOffset = yOffset - 150
     
-    CreateSeparator()
-    yOffset = yOffset - 10
-    
-    -- Botón Reset
+    -- Reset button
     local resetBtn = CreateFrame("Button", nil, scrollChild, "UIPanelButtonTemplate")
-    resetBtn:SetSize(200, 35)
+    resetBtn:SetSize(220, 35)
     resetBtn:SetPoint("TOP", 0, yOffset)
-    resetBtn:SetText("Resetear Toda la Configuración")
+    resetBtn:SetText("Resetear Configuración")
     resetBtn:SetScript("OnClick", function()
         StaticPopup_Show("SMARTLOOT_RESET_CONFIRM")
     end)
@@ -707,7 +780,7 @@ function SL.UI:CreateOptionsContent(parent)
 end
 
 -- ===========================================
--- TAB DE ITEMS IGNORADOS
+-- IGNORED ITEMS CONTENT
 -- ===========================================
 
 function SL.UI:CreateIgnoredContent(parent)
@@ -715,55 +788,69 @@ function SL.UI:CreateIgnoredContent(parent)
     content:SetAllPoints()
     content:Hide()
     
-    -- Título
-    local title = content:CreateFontString(nil, "OVERLAY", "GameFontNormalHuge")
-    title:SetPoint("TOP", 0, -20)
+    -- Header
+    local header = CreateFrame("Frame", nil, content)
+    header:SetSize(parent:GetWidth() - 40, 50)
+    header:SetPoint("TOP", 0, -15)
+    
+    local icon = header:CreateTexture(nil, "ARTWORK")
+    icon:SetSize(36, 36)
+    icon:SetPoint("LEFT", 10, 0)
+    icon:SetTexture("Interface\\Icons\\Ability_Rogue_FeignDeath")
+    
+    local title = header:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+    title:SetPoint("LEFT", icon, "RIGHT", 10, 0)
     title:SetText("Items Ignorados")
+    title:SetTextColor(COLORS.primary[1], COLORS.primary[2], COLORS.primary[3])
     
-    -- Descripción
-    local description = content:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-    description:SetPoint("TOP", 0, -55)
-    description:SetWidth(480)
-    description:SetJustifyH("LEFT")
-    description:SetText("Los items en esta lista NUNCA serán recogidos, incluso si cumplen con otros filtros.\n" ..
-                       "Útil para ignorar recetas molestas u objetos específicos que no quieres.")
+    local line = header:CreateTexture(nil, "ARTWORK")
+    line:SetSize(parent:GetWidth() - 60, 2)
+    line:SetPoint("BOTTOM", 0, 0)
+    line:SetTexture("Interface\\Tooltips\\UI-Tooltip-Background")
+    line:SetVertexColor(COLORS.primary[1] * 0.5, COLORS.primary[2] * 0.5, COLORS.primary[3] * 0.5, 0.6)
     
-    -- Caja de información
+    -- Info box
     local infoBox = CreateFrame("Frame", nil, content)
-    infoBox:SetSize(480, 80)
-    infoBox:SetPoint("TOP", 0, -105)
+    infoBox:SetSize(parent:GetWidth() - 40, 85)
+    infoBox:SetPoint("TOP", 0, -75)
     infoBox:SetBackdrop({
         bgFile = "Interface\\Tooltips\\UI-Tooltip-Background",
         edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
         tile = true, tileSize = 16, edgeSize = 16,
         insets = { left = 4, right = 4, top = 4, bottom = 4 }
     })
-    infoBox:SetBackdropColor(0.1, 0.1, 0.2, 0.8)
-    infoBox:SetBackdropBorderColor(0.4, 0.4, 0.6, 1)
+    infoBox:SetBackdropColor(0.1, 0.3, 0.5, 0.3)
+    
+    local infoIcon = infoBox:CreateTexture(nil, "ARTWORK")
+    infoIcon:SetSize(40, 40)
+    infoIcon:SetPoint("LEFT", 15, 0)
+    infoIcon:SetTexture("Interface\\Icons\\INV_Misc_Note_01")
     
     local infoText = infoBox:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    infoText:SetPoint("CENTER")
-    infoText:SetWidth(450)
+    infoText:SetPoint("LEFT", infoIcon, "RIGHT", 15, 0)
+    infoText:SetWidth(infoBox:GetWidth() - 80)
     infoText:SetJustifyH("LEFT")
-    infoText:SetText("|cFFFFFF00Cómo añadir items:|r\n" ..
-                    "1. Activa 'Mostrar ID en tooltips' en Opciones\n" ..
-                    "2. Pasa el ratón sobre el item que quieres ignorar\n" ..
-                    "3. Usa el comando: |cFF00FF00/sl ignore <ID>|r")
+    infoText:SetText(
+        "|cFFFFFFFFCómo añadir items:|r\n" ..
+        "1. Activa 'Mostrar ID en tooltips' en Opciones\n" ..
+        "2. Pasa el ratón sobre el item\n" ..
+        "3. Usa: |cFF00FF00/sl ignore <ID>|r"
+    )
     
-    -- ScrollFrame para la lista
+    -- ScrollFrame
     local scrollFrame = CreateFrame("ScrollFrame", nil, content, "UIPanelScrollFrameTemplate")
-    scrollFrame:SetSize(490, 240)
-    scrollFrame:SetPoint("TOP", 0, -195)
+    scrollFrame:SetSize(parent:GetWidth() - 50, parent:GetHeight() - 220)
+    scrollFrame:SetPoint("TOP", 0, -170)
     
     local scrollChild = CreateFrame("Frame", nil, scrollFrame)
-    scrollChild:SetSize(470, 1)
+    scrollChild:SetSize(parent:GetWidth() - 70, 1)
     scrollFrame:SetScrollChild(scrollChild)
     
     self.IgnoredScrollChild = scrollChild
     
-    -- Botón refrescar
+    -- Refresh button
     local refreshBtn = CreateFrame("Button", nil, content, "UIPanelButtonTemplate")
-    refreshBtn:SetSize(120, 30)
+    refreshBtn:SetSize(130, 32)
     refreshBtn:SetPoint("BOTTOM", 0, 15)
     refreshBtn:SetText("Refrescar Lista")
     refreshBtn:SetScript("OnClick", function()
@@ -778,41 +865,37 @@ end
 function SL.UI:RefreshIgnoredList()
     if not self.IgnoredScrollChild then return end
     
-    -- Limpiar lista anterior
     local children = {self.IgnoredScrollChild:GetChildren()}
     for _, child in ipairs(children) do
         child:Hide()
         child:SetParent(nil)
     end
     
-    -- Crear nueva lista
-    local yOffset = -5
-    local count = 0
-    
-    -- Ordenar items ignorados
     local sortedIgnored = {}
     for itemID, _ in pairs(SL.IgnoredItems) do
         table.insert(sortedIgnored, itemID)
     end
     table.sort(sortedIgnored)
     
+    local yOffset = -10
+    local count = 0
+    
     for _, itemID in ipairs(sortedIgnored) do
         local itemName, itemLink = GetItemInfo(itemID)
         
         local row = CreateFrame("Frame", nil, self.IgnoredScrollChild)
-        row:SetSize(460, 32)
+        row:SetSize(self.IgnoredScrollChild:GetWidth(), 36)
         row:SetPoint("TOP", 0, yOffset)
         
-        -- Background alternado
         if count % 2 == 0 then
             local bg = row:CreateTexture(nil, "BACKGROUND")
             bg:SetAllPoints()
-            bg:SetColorTexture(0.1, 0.1, 0.1, 0.3)
+            bg:SetTexture("Interface\\Tooltips\\UI-Tooltip-Background")
+            bg:SetVertexColor(0.1, 0.1, 0.15, 0.4)
         end
         
-        -- Icono del item
         local icon = row:CreateTexture(nil, "ARTWORK")
-        icon:SetSize(24, 24)
+        icon:SetSize(28, 28)
         icon:SetPoint("LEFT", 10, 0)
         
         if itemLink then
@@ -826,21 +909,18 @@ function SL.UI:RefreshIgnoredList()
             icon:SetTexture("Interface\\Icons\\INV_Misc_QuestionMark")
         end
         
-        -- Nombre del item
-        local text = row:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-        text:SetPoint("LEFT", icon, "RIGHT", 8, 0)
-        text:SetWidth(320)
+        local text = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+        text:SetPoint("LEFT", icon, "RIGHT", 10, 0)
+        text:SetWidth(350)
         text:SetJustifyH("LEFT")
-        
         if itemLink then
             text:SetText(itemLink)
         else
-            text:SetText("|cFFFF6600ID: " .. itemID .. " |cFF999999(nombre desconocido)|r")
+            text:SetText("|cFFFF6600ID: " .. itemID .. " |cFF999999(desconocido)|r")
         end
         
-        -- Botón eliminar
         local deleteBtn = CreateFrame("Button", nil, row, "UIPanelButtonTemplate")
-        deleteBtn:SetSize(80, 24)
+        deleteBtn:SetSize(90, 24)
         deleteBtn:SetPoint("RIGHT", -10, 0)
         deleteBtn:SetText("Desbloquear")
         deleteBtn:SetScript("OnClick", function()
@@ -850,53 +930,103 @@ function SL.UI:RefreshIgnoredList()
             SL:SaveConfig()
         end)
         
-        yOffset = yOffset - 34
+        yOffset = yOffset - 38
         count = count + 1
     end
     
     if count == 0 then
         local emptyIcon = self.IgnoredScrollChild:CreateTexture(nil, "ARTWORK")
         emptyIcon:SetSize(64, 64)
-        emptyIcon:SetPoint("TOP", 0, -40)
+        emptyIcon:SetPoint("TOP", 0, -60)
         emptyIcon:SetTexture("Interface\\Icons\\INV_Misc_QuestionMark")
         emptyIcon:SetAlpha(0.3)
         
         local emptyText = self.IgnoredScrollChild:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
-        emptyText:SetPoint("TOP", 0, -110)
-        emptyText:SetText("|cFFAAAAAA(No hay items ignorados)|r")
+        emptyText:SetPoint("TOP", 0, -130)
+        emptyText:SetTextColor(0.7, 0.7, 0.7, 0.6)
+        emptyText:SetText("No hay items ignorados")
         
         local hint = self.IgnoredScrollChild:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-        hint:SetPoint("TOP", 0, -140)
+        hint:SetPoint("TOP", 0, -160)
         hint:SetWidth(400)
         hint:SetJustifyH("CENTER")
-        hint:SetText("|cFFAAAAAAUsa |cFF00FF00/sl ignore <ID>|cFFAAAAAA para añadir items|r")
+        hint:SetTextColor(0.7, 0.7, 0.7, 0.6)
+        hint:SetText("Usa |cFF00FF00/sl ignore <ID>|r para añadir items")
     end
     
-    -- Ajustar tamaño del scroll child
-    self.IgnoredScrollChild:SetHeight(math.max(240, count * 34 + 10))
+    self.IgnoredScrollChild:SetHeight(math.max(250, count * 38 + 20))
 end
 
 -- ===========================================
--- BOTÓN FLOTANTE
+-- FOOTER
+-- ===========================================
+
+function SL.UI:CreateFooter(parent)
+    local footer = CreateFrame("Frame", nil, parent)
+    footer:SetSize(parent:GetWidth() - 16, 35)
+    footer:SetPoint("BOTTOM", 0, 8)
+    
+    local bg = footer:CreateTexture(nil, "BACKGROUND")
+    bg:SetAllPoints()
+    bg:SetTexture("Interface\\Tooltips\\UI-Tooltip-Background")
+    bg:SetVertexColor(0.1, 0.1, 0.15, 0.9)
+    
+    local line = footer:CreateTexture(nil, "ARTWORK")
+    line:SetHeight(1)
+    line:SetPoint("TOPLEFT", 10, 0)
+    line:SetPoint("TOPRIGHT", -10, 0)
+    line:SetTexture("Interface\\Tooltips\\UI-Tooltip-Background")
+    line:SetVertexColor(0.5, 0.5, 0.5, 0.6)
+    
+    local helpText = footer:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    helpText:SetPoint("LEFT", 15, 0)
+    helpText:SetTextColor(0.7, 0.7, 0.7)
+    helpText:SetText("Usa |cFF00FF00/sl help|r para ver todos los comandos")
+    
+    local versionText = footer:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    versionText:SetPoint("RIGHT", -15, 0)
+    versionText:SetTextColor(0.7, 0.7, 0.7)
+    versionText:SetText("SmartLoot v" .. SL.version .. " by LoD-heba")
+end
+
+-- ===========================================
+-- FLOATING BUTTON
 -- ===========================================
 
 function SL.UI:CreateFloatingButton()
     local btn = CreateFrame("Button", "SmartLootFloatingButton", UIParent)
-    btn:SetSize(32, 32)
+    btn:SetSize(38, 38)
     btn:SetPoint("CENTER", Minimap, "CENTER", 0, -80)
     btn:SetMovable(true)
     btn:EnableMouse(true)
     btn:RegisterForDrag("LeftButton")
     btn:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+    btn:SetFrameStrata("MEDIUM")
     
-    local texture = btn:CreateTexture(nil, "BACKGROUND")
-    texture:SetAllPoints()
-    texture:SetTexture("Interface\\Icons\\INV_Misc_Bag_10")
+    -- Background
+    local bg = btn:CreateTexture(nil, "BACKGROUND")
+    bg:SetAllPoints()
+    bg:SetTexture("Interface\\Tooltips\\UI-Tooltip-Background")
+    bg:SetVertexColor(0.05, 0.05, 0.08, 0.9)
     
+    -- Icon
+    local icon = btn:CreateTexture(nil, "ARTWORK")
+    icon:SetSize(32, 32)
+    icon:SetPoint("CENTER")
+    icon:SetTexture("Interface\\Icons\\INV_Misc_Bag_10")
+    
+    -- Border
     local border = btn:CreateTexture(nil, "OVERLAY")
-    border:SetSize(52, 52)
+    border:SetSize(50, 50)
     border:SetPoint("CENTER")
     border:SetTexture("Interface\\Minimap\\MiniMap-TrackingBorder")
+    
+    -- Status indicator
+    local statusDot = btn:CreateTexture(nil, "OVERLAY")
+    statusDot:SetSize(10, 10)
+    statusDot:SetPoint("TOPRIGHT", -2, -2)
+    statusDot:SetTexture("Interface\\TARGETINGFRAME\\UI-RaidTargetingIcons")
+    self.FloatingStatusDot = statusDot
     
     btn:SetScript("OnDragStart", function(self)
         self:StartMoving()
@@ -916,48 +1046,64 @@ function SL.UI:CreateFloatingButton()
             end
         elseif button == "RightButton" then
             SL.config.enabled = not SL.config.enabled
-            local status = SL.config.enabled and "|cFF00FF00Activado|r" or "|cFFFF0000Desactivado|r"
-            DEFAULT_CHAT_FRAME:AddMessage("|cFF00FF00[SmartLoot]|r " .. status)
             SL.UI:UpdateStatus()
-            if SL.UI.ToggleBtn then
-                SL.UI.ToggleBtn:SetText(SL.config.enabled and "DESACTIVAR" or "ACTIVAR")
-            end
             SL:SaveConfig()
         end
     end)
     
     btn:SetScript("OnEnter", function(self)
         GameTooltip:SetOwner(self, "ANCHOR_LEFT")
-        GameTooltip:SetText("|cFF00FF00SmartLoot|r v" .. SL.version)
-        GameTooltip:AddLine("Estado: " .. (SL.config.enabled and "|cFF00FF00● Activado|r" or "|cFFFF0000● Desactivado|r"), 1, 1, 1)
-        GameTooltip:AddLine(" ", 1, 1, 1)
-        GameTooltip:AddLine("|cFFFFFFFFClick izquierdo:|r Abrir/Cerrar menú", 1, 1, 1)
-        GameTooltip:AddLine("|cFFFFFFFFClick derecho:|r ON/OFF rápido", 1, 1, 1)
-        GameTooltip:AddLine("|cFFFFFFFFArrastrar:|r Mover botón", 0.7, 0.7, 0.7)
+        GameTooltip:ClearLines()
+        GameTooltip:AddLine("|cFF00FF00SmartLoot|r", 1, 1, 1)
+        GameTooltip:AddLine("v" .. SL.version, 0.7, 0.7, 0.7)
+        GameTooltip:AddLine(" ")
+        
+        local statusColor = SL.config.enabled and "|cFF00FF00" or "|cFFFF0000"
+        local statusText = SL.config.enabled and "ACTIVADO" or "DESACTIVADO"
+        GameTooltip:AddDoubleLine("Estado:", statusColor .. statusText .. "|r", 1, 1, 1, 1, 1, 1)
+        
+        GameTooltip:AddLine(" ")
+        GameTooltip:AddLine("|cFFFFFFFFClick Izquierdo:|r Abrir/Cerrar", 1, 1, 1)
+        GameTooltip:AddLine("|cFFFFFFFFClick Derecho:|r ON/OFF", 1, 1, 1)
+        GameTooltip:AddLine("|cFFFFFFFFArrastrar:|r Mover", 0.7, 0.7, 0.7)
         GameTooltip:Show()
     end)
     
-    btn:SetScript("OnLeave", function()
+    btn:SetScript("OnLeave", function(self)
         GameTooltip:Hide()
     end)
     
     self.FloatingButton = btn
+    self:UpdateFloatingButton()
+end
+
+function SL.UI:UpdateFloatingButton()
+    if not self.FloatingButton or not self.FloatingStatusDot then return end
+    
+    local enabled = SL.config and SL.config.enabled or false
+    self.FloatingStatusDot:SetTexCoord(enabled and 0 or 0.25, enabled and 0.25 or 0.5, 0, 1)
 end
 
 -- ===========================================
--- POPUP DE CONFIRMACIÓN PARA RESET
+-- POPUP CONFIRMATIONS
 -- ===========================================
 
 StaticPopupDialogs["SMARTLOOT_RESET_CONFIRM"] = {
-    text = "|cFFFF0000¿RESETEAR TODA LA CONFIGURACIÓN?|r\n\nEsto eliminará:\n• Todas las opciones configuradas\n• Items personalizados añadidos\n• Lista de items ignorados\n• Posiciones guardadas\n\n|cFFFFFF00Esta acción NO se puede deshacer.|r",
-    button1 = "Sí, Resetear Todo",
+    text = "|cFFFF0000¿RESETEAR CONFIGURACIÓN?|r\n\n" ..
+           "Se eliminará:\n" ..
+           "• Todas las opciones\n" ..
+           "• Items personalizados\n" ..
+           "• Lista de ignorados\n" ..
+           "• Posiciones guardadas\n\n" ..
+           "|cFFFFFF00Esta acción no se puede deshacer|r",
+    button1 = "Sí, Resetear",
     button2 = "Cancelar",
     OnAccept = function()
         SmartLoot:ResetConfig()
         if SmartLoot.UI and SmartLoot.UI.MainFrame then
             SmartLoot.UI.MainFrame:Hide()
             DEFAULT_CHAT_FRAME:AddMessage("|cFF00FF00[SmartLoot]|r Configuración reseteada")
-            DEFAULT_CHAT_FRAME:AddMessage("|cFFFFFF00[SmartLoot]|r Usa /reload para aplicar todos los cambios")
+            DEFAULT_CHAT_FRAME:AddMessage("|cFFFFFF00[SmartLoot]|r Usa /reload para aplicar cambios")
         end
     end,
     timeout = 0,
@@ -967,12 +1113,17 @@ StaticPopupDialogs["SMARTLOOT_RESET_CONFIRM"] = {
 }
 
 -- ===========================================
--- INICIALIZACIÓN
+-- INITIALIZATION
 -- ===========================================
 
 function SL.UI:Initialize()
     self:CreateMainFrame()
     self:CreateFloatingButton()
+    
+    -- Restore positions after UI is created
+    if SL.RestorePositions then
+        SL:RestorePositions()
+    end
 end
 
 function SL.UI:Show()
@@ -987,9 +1138,10 @@ function SL.UI:Hide()
     end
 end
 
--- Inicializar UI cuando el jugador entre
+-- Initialize UI on player login
 local initFrame = CreateFrame("Frame")
 initFrame:RegisterEvent("PLAYER_LOGIN")
 initFrame:SetScript("OnEvent", function()
     SL.UI:Initialize()
+    DEFAULT_CHAT_FRAME:AddMessage("|cFF00FF00[SmartLoot]|r Interfaz cargada correctamente")
 end)

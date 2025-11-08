@@ -82,11 +82,13 @@ function SL:LoadConfig()
             yOffset = 0,
         }
     end
+    
+    -- Cargar estados de items
     if SmartLootDB.itemStates then
-        for profKey, profession in pairs(self.ItemDatabase) do
+        for profKey, profession in pairs(self.ItemDatabase or {}) do
             if SmartLootDB.itemStates[profKey] then
                 for itemID, enabled in pairs(SmartLootDB.itemStates[profKey]) do
-                    if profession.items[itemID] then
+                    if profession.items and profession.items[itemID] then
                         profession.items[itemID].enabled = enabled
                     end
                 end
@@ -113,11 +115,11 @@ function SL:SaveConfig()
     if self.UI and self.UI.FloatingButton then
         local point, _, relativePoint, xOffset, yOffset = self.UI.FloatingButton:GetPoint()
         SmartLootDB.buttonPosition = {
-            point = point,
+            point = point or "CENTER",
             relativeTo = "Minimap",
-            relativePoint = relativePoint,
-            xOffset = xOffset,
-            yOffset = yOffset,
+            relativePoint = relativePoint or "CENTER",
+            xOffset = xOffset or 0,
+            yOffset = yOffset or -80,
         }
     end
     
@@ -125,16 +127,20 @@ function SL:SaveConfig()
     if self.UI and self.UI.MainFrame then
         local point, _, _, xOffset, yOffset = self.UI.MainFrame:GetPoint()
         SmartLootDB.framePosition = {
-            point = point,
-            xOffset = xOffset,
-            yOffset = yOffset,
+            point = point or "CENTER",
+            xOffset = xOffset or 0,
+            yOffset = yOffset or 0,
         }
     end
+    
+    -- Guardar estados de items
     SmartLootDB.itemStates = {}
-    for profKey, profession in pairs(self.ItemDatabase) do
+    for profKey, profession in pairs(self.ItemDatabase or {}) do
         SmartLootDB.itemStates[profKey] = {}
-        for itemID, item in pairs(profession.items) do
-            SmartLootDB.itemStates[profKey][itemID] = item.enabled
+        if profession.items then
+            for itemID, item in pairs(profession.items) do
+                SmartLootDB.itemStates[profKey][itemID] = item.enabled
+            end
         end
     end
 end
@@ -195,7 +201,7 @@ end
 
 function SL:RestorePositions()
     -- Restaurar posición del botón flotante
-    if self.UI and self.UI.FloatingButton and SmartLootDB.buttonPosition then
+    if self.UI and self.UI.FloatingButton and SmartLootDB and SmartLootDB.buttonPosition then
         local pos = SmartLootDB.buttonPosition
         self.UI.FloatingButton:ClearAllPoints()
         self.UI.FloatingButton:SetPoint(
@@ -208,7 +214,7 @@ function SL:RestorePositions()
     end
     
     -- Restaurar posición de la ventana principal
-    if self.UI and self.UI.MainFrame and SmartLootDB.framePosition then
+    if self.UI and self.UI.MainFrame and SmartLootDB and SmartLootDB.framePosition then
         local pos = SmartLootDB.framePosition
         self.UI.MainFrame:ClearAllPoints()
         self.UI.MainFrame:SetPoint(

@@ -213,7 +213,7 @@ function SL:HandleCommand(msg)
             self.IgnoredItems[itemID] = true
             local itemName = GetItemInfo(itemID) or "ID: " .. itemID
             DEFAULT_CHAT_FRAME:AddMessage("|cFF00FF00[SmartLoot]|r Item ignorado: " .. itemName)
-            if self.UI then
+            if self.UI and self.UI.RefreshIgnoredList then
                 self.UI:RefreshIgnoredList()
             end
             self:SaveConfig()
@@ -227,7 +227,7 @@ function SL:HandleCommand(msg)
             self.IgnoredItems[itemID] = nil
             local itemName = GetItemInfo(itemID) or "ID: " .. itemID
             DEFAULT_CHAT_FRAME:AddMessage("|cFF00FF00[SmartLoot]|r Item desbloqueado: " .. itemName)
-            if self.UI then
+            if self.UI and self.UI.RefreshIgnoredList then
                 self.UI:RefreshIgnoredList()
             end
             self:SaveConfig()
