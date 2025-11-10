@@ -10,7 +10,7 @@ SL.UI = {}
 
 function SL.UI:CreateMainFrame()
     local frame = CreateFrame("Frame", "SmartLootMainFrame", UIParent)
-    frame:SetSize(500, 550)
+    frame:SetSize(650, 580)
     frame:SetPoint("CENTER")
     frame:SetBackdrop({
         bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background",
@@ -89,17 +89,17 @@ function SL.UI:CreateTabs(parent)
     local tabs = {}
     local contents = {}
     
-    -- Crear tabs para cada profesión
+    -- Crear tabs para cada profesión - CORREGIDO: Mejor espaciado
     for i, key in ipairs(professionKeys) do
         local prof = SL.ItemDatabase[key]
         if prof then
             local tab = CreateFrame("Button", nil, parent)
-            tab:SetSize(60, 60)
+            tab:SetSize(70, 70)
             
-            -- Posición en grid
+            -- Posición en grid - CORREGIDO: Más espacio entre tabs
             local row = math.floor((i - 1) / 4)
             local col = (i - 1) % 4
-            tab:SetPoint("TOPLEFT", 10 + (col * 120), -105 - (row * 70))
+            tab:SetPoint("TOPLEFT", 20 + (col * 150), -110 - (row * 75))
             
             -- Icono
             local icon = tab:CreateTexture(nil, "ARTWORK")
@@ -129,10 +129,10 @@ function SL.UI:CreateTabs(parent)
         end
     end
     
-    -- Tab de opciones generales
+    -- Tab de opciones generales - CORREGIDO: Posición independiente
     local optionsTab = CreateFrame("Button", nil, parent)
-    optionsTab:SetSize(60, 60)
-    optionsTab:SetPoint("TOPLEFT", 10, -105 - (2 * 70))
+    optionsTab:SetSize(70, 70)
+    optionsTab:SetPoint("TOPLEFT", 20, -260)
     
     local optionsIcon = optionsTab:CreateTexture(nil, "ARTWORK")
     optionsIcon:SetSize(45, 45)
@@ -154,10 +154,10 @@ function SL.UI:CreateTabs(parent)
     table.insert(tabs, optionsTab)
     table.insert(contents, self:CreateOptionsContent(parent))
     
-    -- Tab de ignorados
+    -- Tab de ignorados - CORREGIDO: Posición al lado de opciones
     local ignoredTab = CreateFrame("Button", nil, parent)
-    ignoredTab:SetSize(60, 60)
-    ignoredTab:SetPoint("LEFT", optionsTab, "RIGHT", 60, 0)
+    ignoredTab:SetSize(70, 70)
+    ignoredTab:SetPoint("LEFT", optionsTab, "RIGHT", 80, 0)
     
     local ignoredIcon = ignoredTab:CreateTexture(nil, "ARTWORK")
     ignoredIcon:SetSize(45, 45)
@@ -215,8 +215,8 @@ end
 
 function SL.UI:CreateProfessionContent(parent, professionKey)
     local content = CreateFrame("Frame", nil, parent)
-    content:SetSize(480, 300)
-    content:SetPoint("TOP", 0, -250)
+    content:SetSize(620, 230)
+    content:SetPoint("TOP", 0, -340)  -- CORREGIDO: Posición más abajo
     content:Hide()
     
     local prof = SL.ItemDatabase[professionKey]
@@ -227,11 +227,11 @@ function SL.UI:CreateProfessionContent(parent, professionKey)
     title:SetPoint("TOP", 0, -5)
     title:SetText("|cFFFFFF00" .. prof.name .. "|r")
     
-    -- Botón "Seleccionar Todos"
+    -- Botones - CORREGIDO: Mejor espaciado horizontal
     local selectAllBtn = CreateFrame("Button", nil, content, "UIPanelButtonTemplate")
-    selectAllBtn:SetSize(100, 25)
-    selectAllBtn:SetPoint("TOPLEFT", 10, -30)
-    selectAllBtn:SetText("Todos")
+    selectAllBtn:SetSize(120, 25)
+    selectAllBtn:SetPoint("TOPLEFT", 20, -30)
+    selectAllBtn:SetText("Marcar Todos")
     selectAllBtn:SetScript("OnClick", function()
         for itemID, item in pairs(prof.items) do
             item.enabled = true
@@ -240,11 +240,10 @@ function SL.UI:CreateProfessionContent(parent, professionKey)
         SL:SaveConfig()
     end)
     
-    -- Botón "Deseleccionar Todos"
     local deselectAllBtn = CreateFrame("Button", nil, content, "UIPanelButtonTemplate")
-    deselectAllBtn:SetSize(100, 25)
-    deselectAllBtn:SetPoint("LEFT", selectAllBtn, "RIGHT", 5, 0)
-    deselectAllBtn:SetText("Ninguno")
+    deselectAllBtn:SetSize(140, 25)
+    deselectAllBtn:SetPoint("LEFT", selectAllBtn, "RIGHT", 10, 0)
+    deselectAllBtn:SetText("Desmarcar Todos")
     deselectAllBtn:SetScript("OnClick", function()
         for itemID, item in pairs(prof.items) do
             item.enabled = false
@@ -253,22 +252,21 @@ function SL.UI:CreateProfessionContent(parent, professionKey)
         SL:SaveConfig()
     end)
     
-    -- Botón "Añadir Item"
     local addItemBtn = CreateFrame("Button", nil, content, "UIPanelButtonTemplate")
-    addItemBtn:SetSize(100, 25)
-    addItemBtn:SetPoint("LEFT", deselectAllBtn, "RIGHT", 5, 0)
-    addItemBtn:SetText("+ Añadir")
+    addItemBtn:SetSize(120, 25)
+    addItemBtn:SetPoint("LEFT", deselectAllBtn, "RIGHT", 10, 0)
+    addItemBtn:SetText("+ Añadir Item")
     addItemBtn:SetScript("OnClick", function()
         self:ShowAddItemDialog(professionKey)
     end)
     
-    -- ScrollFrame para los items
+    -- ScrollFrame - CORREGIDO: Tamaño ajustado
     local scrollFrame = CreateFrame("ScrollFrame", nil, content, "UIPanelScrollFrameTemplate")
-    scrollFrame:SetSize(450, 230)
+    scrollFrame:SetSize(590, 160)
     scrollFrame:SetPoint("TOP", 0, -65)
     
     local scrollChild = CreateFrame("Frame", nil, scrollFrame)
-    scrollChild:SetSize(430, 1)
+    scrollChild:SetSize(570, 1)
     scrollFrame:SetScrollChild(scrollChild)
     
     content.scrollChild = scrollChild
@@ -320,7 +318,7 @@ function SL.UI:RefreshProfessionContent(professionKey)
         local item = itemEntry.data
         
         local row = CreateFrame("Frame", nil, scrollChild)
-        row:SetSize(420, 25)
+        row:SetSize(560, 25)
         row:SetPoint("TOP", 0, yOffset)
         
         -- Checkbox
@@ -348,7 +346,7 @@ function SL.UI:RefreshProfessionContent(professionKey)
         -- Nombre del item
         local text = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
         text:SetPoint("LEFT", icon, "RIGHT", 5, 0)
-        text:SetWidth(250)
+        text:SetWidth(420)
         text:SetJustifyH("LEFT")
         
         if itemLink then
@@ -371,7 +369,7 @@ function SL.UI:RefreshProfessionContent(professionKey)
             end)
         end
         
-        yOffset = yOffset - 30
+        yOffset = yOffset - 28
         count = count + 1
     end
     
@@ -381,21 +379,22 @@ function SL.UI:RefreshProfessionContent(professionKey)
         emptyText:SetText("|cFFAAAAAA(No hay items configurados)|r")
     end
     
-    scrollChild:SetHeight(math.max(230, count * 30))
+    scrollChild:SetHeight(math.max(160, count * 28))
 end
+
 -- ===========================================
 -- DIÁLOGO PARA AÑADIR ITEMS
 -- ===========================================
 
 function SL.UI:ShowAddItemDialog(professionKey)
-    -- Si ya existe el diálogo, mostrarlo
     if self.AddItemDialog then
         self.AddItemDialog:Show()
         self.AddItemDialog.professionKey = professionKey
+        self.AddItemDialog.editBoxID:SetText("")
+        self.AddItemDialog.editBoxName:SetText("")
         return
     end
     
-    -- Crear diálogo
     local dialog = CreateFrame("Frame", "SmartLootAddItemDialog", UIParent)
     dialog:SetSize(350, 200)
     dialog:SetPoint("CENTER")
@@ -468,7 +467,6 @@ function SL.UI:ShowAddItemDialog(professionKey)
             return
         end
         
-        -- Si no hay nombre, intentar obtenerlo del juego
         if not itemName or itemName == "" then
             local name = GetItemInfo(itemID)
             itemName = name or ("Item ID: " .. itemID)
